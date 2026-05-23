@@ -14,3 +14,32 @@ INFO:     127.0.0.1:51978 - "GET /result/914f10a2-8417-4205-8d80-989cc62874b7 HT
 INFO:     127.0.0.1:63639 - "POST /verify HTTP/1.1" 200 OK
 INFO:     127.0.0.1:55966 - "GET /result/b94d9798-7b7c-4eab-9f98-863cb29e8ff3 HTTP/1.1" 200 OK
 INFO:     127.0.0.1:55966 - "GET /result/b94d9798-7b7c-4eab-9f98-863cb29e8ff3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54010 - "GET /result/b94d9798-7b7c-4eab-9f98-863cb29e8ff3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54472 - "GET /history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56338 - "GET /result/b94d9798-7b7c-4eab-9f98-863cb29e8ff3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51375 - "GET /result/b94d9798-7b7c-4eab-9f98-863cb29e8ff3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55156 - "OPTIONS /verify HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55156 - "POST /verify HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55156 - "GET /result/035bc76b-79e3-4af1-8887-fbf32ef0752f HTTP/1.1" 500 Internal Server Error
+INFO:     127.0.0.1:54138 - "GET /result/035bc76b-79e3-4af1-8887-fbf32ef0752f HTTP/1.1" 500 Internal Server Error
+INFO:     127.0.0.1:52294 - "GET /result/035bc76b-79e3-4af1-8887-fbf32ef0752f HTTP/1.1" 500 Internal Server Error
+INFO:     127.0.0.1:65393 - "GET /result/035bc76b-79e3-4af1-8887-fbf32ef0752f HTTP/1.1" 500 Internal Server Error
+INFO:     127.0.0.1:65431 - "GET /result/035bc76b-79e3-4af1-8887-fbf32ef0752f HTTP/1.1" 500 Internal Server Error
+INFO:     127.0.0.1:60294 - "GET /result/035bc76b-79e3-4af1-8887-fbf32ef0752f HTTP/1.1" 500 Internal Server Error
+INFO:     127.0.0.1:59684 - "GET /result/035bc76b-79e3-4af1-8887-fbf32ef0752f HTTP/1.1" 500 Internal Server Error
+INFO:     127.0.0.1:57380 - "GET /result/035bc76b-79e3-4af1-8887-fbf32ef0752f HTTP/1.1" 500 Internal Server Error
+INFO:     127.0.0.1:60238 - "GET /result/035bc76b-79e3-4af1-8887-fbf32ef0752f HTTP/1.1" 500 Internal Server Error
+INFO:     127.0.0.1:52051 - "GET /result/035bc76b-79e3-4af1-8887-fbf32ef0752f HTTP/1.1" 500 Internal Server Error
+INFO:     127.0.0.1:53745 - "GET /result/035bc76b-79e3-4af1-8887-fbf32ef0752f HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53745 - "GET /result/035bc76b-79e3-4af1-8887-fbf32ef0752f HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61443 - "GET /result/035bc76b-79e3-4af1-8887-fbf32ef0752f HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50073 - "GET /result/035bc76b-79e3-4af1-8887-fbf32ef0752f HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50073 - "GET /result/035bc76b-79e3-4af1-8887-fbf32ef0752f HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52645 - "GET /result/035bc76b-79e3-4af1-8887-fbf32ef0752f HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50330 - "GET /history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51615 - "GET /history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61130 - "GET /history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53465 - "GET /history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63310 - "GET /history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65433 - "GET /history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62078 - "GET /result/914f10a2-8417-4205-8d80-989cc62874b7 HTTP/1.1" 200 OK

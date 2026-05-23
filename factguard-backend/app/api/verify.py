@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from datetime import datetime, timezone
 
@@ -7,6 +8,7 @@ from pydantic import BaseModel
 from app.services.cache import (
     compute_claim_hash,
     get_cached_analysis,
+    push_claim_to_history,
     set_cached_analysis,
 )
 from app.services.gemini import (
@@ -30,6 +32,55 @@ class VerifyRequest(
     claim: str
 
 
+async def process_claim(
+    claim_id: str, claim_text: str, job_id: str
+):
+    try:
+        claim_hash = compute_claim_hash(
+            claim_text
+        )
+        cached = await get_cached_analysis(
+            claim_hash
+        )
+        if cached:
+            result = cached
+        else:
+            result = await analyze_claim(
+                claim_text
+            )
+            await set_cached_analysis(
+                claim_hash, result
+            )
+
+        result_id = await save_result(
+            claim_id, result
+        )
+
+        await save_sources(
+            result_id,
+            result.get(
+                "sources", []
+            ),
+        )
+
+        await update_claim_status(
+            claim_id, "done"
+        )
+
+        await push_claim_to_history({
+            "jobId": job_id,
+            "claim": claim_text,
+            "status": "done",
+            "createdAt": datetime.now(
+                timezone.utc
+            ).isoformat(),
+        })
+    except Exception:
+        await update_claim_status(
+            claim_id, "error"
+        )
+
+
 @router.post("/verify")
 async def verify(
     payload: VerifyRequest
@@ -40,42 +91,14 @@ async def verify(
         payload.claim, job_id
     )
 
-    claim_hash = compute_claim_hash(
-        payload.claim
-    )
-    cached = await get_cached_analysis(
-        claim_hash
-    )
-    if cached:
-        result = cached
-    else:
-        result = await analyze_claim(
-            payload.claim
+    asyncio.create_task(
+        process_claim(
+            claim_id, payload.claim, job_id
         )
-        await set_cached_analysis(
-            claim_hash, result
-        )
-
-    result_id = await save_result(
-        claim_id, result
-    )
-
-    await save_sources(
-        result_id,
-        result.get("sources", []),
-    )
-
-    await update_claim_status(
-        claim_id, "done"
     )
 
     return {
-        **result,
         "jobId": job_id,
-        "claim": payload.claim,
-        "createdAt": datetime.now(
-            timezone.utc
-        ).isoformat(),
     }
 
 
@@ -83,10 +106,18 @@ async def verify(
 async def get_result(
     job_id: str,
 ):
-    data = await get_full_result(job_id)
+    data = await get_full_result(
+        job_id
+    )
+
     if not data:
         raise HTTPException(
             status_code=404,
             detail="Result not found",
         )
+
+    status = data.get("status")
+    if status == "processing":
+        return {"status": "processing"}
+
     return data

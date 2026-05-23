@@ -1,7 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import {
+  useLayoutEffect,
+  useState,
+} from 'react';
 import { useRouter } from 'next/navigation';
+import SplashScreen from '@/components/SplashScreen';
 
 const API_URL =
   process.env
@@ -14,13 +18,29 @@ export default function HomePage() {
 
   const [loading, setLoading] =
     useState(false);
+  const [showSplash, setShowSplash] =
+    useState(false);
 
   const router =
     useRouter();
 
+  useLayoutEffect(() => {
+    const shown =
+      sessionStorage.getItem(
+        'splashShown'
+      );
+    if (!shown) {
+      setShowSplash(true);
+    }
+  }, []);
+
   async function handleAnalyse() {
     if (!claim.trim())
       return;
+    if (claim.length > 1000) {
+      alert('Claim is too long (max 1000 characters)');
+      return;
+    }
 
     try {
       setLoading(true);
@@ -78,14 +98,28 @@ export default function HomePage() {
     'Apple is acquiring Netflix',
   ];
 
+  if (showSplash) {
+    return (
+      <SplashScreen
+        onDone={() => {
+          sessionStorage.setItem(
+            'splashShown',
+            '1'
+          );
+          setShowSplash(false);
+        }}
+      />
+    );
+  }
+
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center px-6 bg-slate-50">
+    <main className="min-h-[calc(100vh-3.5rem)] flex flex-col items-center justify-center px-6 bg-[var(--background)]">
       <div className="max-w-3xl w-full text-center">
-        <h1 className="text-6xl font-bold text-slate-900">
+        <h1 className="text-6xl font-bold text-[var(--foreground)]">
           FactGuard
         </h1>
 
-        <p className="text-slate-500 mt-4 text-lg">
+        <p className="text-[var(--muted-foreground)] mt-4 text-lg">
           AI-powered trust
           verification in
           under 60 seconds
@@ -99,7 +133,7 @@ export default function HomePage() {
             )
           }
           placeholder="Enter a claim to verify..."
-          className="w-full mt-10 h-48 rounded-2xl border border-slate-300 p-5 text-lg outline-none focus:ring-2 focus:ring-indigo-500 resize-none bg-white"
+          className="w-full mt-10 h-48 rounded-2xl border border-[var(--card-border)] p-5 text-lg outline-none focus:ring-2 focus:ring-[var(--accent)] resize-none bg-[var(--card)] text-[var(--foreground)] placeholder-[var(--muted-foreground)]"
         />
 
         <button
@@ -109,7 +143,7 @@ export default function HomePage() {
           disabled={
             loading
           }
-          className="w-full mt-6 bg-indigo-500 hover:bg-indigo-600 transition-colors text-white py-4 rounded-2xl text-lg font-semibold disabled:opacity-60"
+          className="w-full mt-6 bg-[var(--accent)] hover:bg-[var(--accent-hover)] transition-colors text-white py-4 rounded-2xl text-lg font-semibold disabled:opacity-60"
         >
           {loading
             ? 'Analysing...'
@@ -130,7 +164,7 @@ export default function HomePage() {
                     example
                   )
                 }
-                className="px-4 py-2 rounded-full border border-slate-300 text-sm hover:bg-slate-100 transition-colors"
+                className="px-4 py-2 rounded-full border border-[var(--card-border)] text-sm text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)] transition-colors"
               >
                 {example}
               </button>

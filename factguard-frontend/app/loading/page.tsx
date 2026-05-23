@@ -3,6 +3,7 @@
 import {
   Suspense,
   useEffect,
+  useRef,
   useState,
 } from 'react';
 import {
@@ -13,12 +14,12 @@ import {
   motion,
 } from 'framer-motion';
 
-const steps = [
-  'Analyzing claim...',
-  'Checking sources...',
-  'Evaluating evidence...',
-  'Generating trust score...',
-];
+const API_URL =
+  process.env
+    .NEXT_PUBLIC_API_URL ||
+  'http://localhost:8000';
+
+const POLL_INTERVAL = 1500;
 
 function LoadingContent() {
   const router =
@@ -31,42 +32,79 @@ function LoadingContent() {
     searchParams.get('job') ||
     'demo';
 
-  const [step, setStep] =
+  const intervalRef =
+    useRef<ReturnType<
+      typeof setInterval
+    > | null>(null);
+
+  const [messageIdx, setMessageIdx] =
     useState(0);
 
+  const messages = [
+    'Analyzing claim...',
+    'Checking sources...',
+    'Evaluating evidence...',
+    'Generating trust score...',
+  ];
+
   useEffect(() => {
-    const interval =
+    const msgInterval =
       setInterval(() => {
-        setStep((prev) => {
-          if (
+        setMessageIdx(
+          (prev) =>
             prev <
-            steps.length - 1
-          ) {
-            return prev + 1;
-          }
+            messages.length - 1
+              ? prev + 1
+              : prev
+        );
+      }, 4000);
 
-          clearInterval(
-            interval
+    async function poll() {
+      try {
+        const res =
+          await fetch(
+            `${API_URL}/result/${jobId}`
           );
+        if (!res.ok) return;
 
-          setTimeout(() => {
-            router.push(
-              `/result/${jobId}`
-            );
-          }, 700);
+        const data =
+          await res.json();
 
-          return prev;
-        });
-      }, 1000);
+        if (
+          data.status &&
+          data.status !==
+            'processing'
+        ) {
+          router.push(
+            `/result/${jobId}`
+          );
+        }
+      } catch {
+        // retry on next interval
+      }
+    }
 
-    return () =>
+    intervalRef.current =
+      setInterval(poll, POLL_INTERVAL);
+
+    poll();
+
+    return () => {
       clearInterval(
-        interval
+        msgInterval
       );
+      if (
+        intervalRef.current
+      ) {
+        clearInterval(
+          intervalRef.current
+        );
+      }
+    };
   }, [router, jobId]);
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-slate-50 px-6">
+    <main className="min-h-[calc(100vh-3.5rem)] flex items-center justify-center bg-[var(--background)] px-6">
       <div className="text-center max-w-md w-full">
         <motion.div
           animate={{
@@ -79,11 +117,11 @@ function LoadingContent() {
             ease:
               'linear',
           }}
-          className="mx-auto h-16 w-16 rounded-full border-4 border-slate-300 border-t-indigo-500"
+          className="mx-auto h-16 w-16 rounded-full border-4 border-[var(--card-border)] border-t-[var(--accent)]"
         />
 
         <motion.h1
-          key={step}
+          key={messageIdx}
           initial={{
             opacity: 0,
             y: 8,
@@ -92,32 +130,36 @@ function LoadingContent() {
             opacity: 1,
             y: 0,
           }}
-          className="mt-8 text-2xl font-semibold text-slate-900"
+          className="mt-8 text-2xl font-semibold text-[var(--foreground)]"
         >
-          {steps[step]}
+          {
+            messages[
+              messageIdx
+            ]
+          }
         </motion.h1>
 
-        <p className="mt-3 text-slate-500">
+        <p className="mt-3 text-[var(--muted-foreground)]">
           FactGuard is
           verifying the
           claim using AI
           evidence analysis
         </p>
 
-        <div className="mt-8 h-2 bg-slate-200 rounded-full overflow-hidden">
+        <div className="mt-8 h-2 bg-[var(--muted)] rounded-full overflow-hidden">
           <motion.div
             initial={{
               width: '0%',
             }}
             animate={{
               width: `${
-                ((step +
+                ((messageIdx +
                   1) /
-                  steps.length) *
+                  messages.length) *
                 100
               }%`,
             }}
-            className="h-full bg-indigo-500"
+            className="h-full bg-[var(--accent)]"
           />
         </div>
       </div>

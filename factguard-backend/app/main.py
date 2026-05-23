@@ -3,6 +3,9 @@ from fastapi.middleware.cors import (
     CORSMiddleware,
 )
 
+from app.api.history import (
+    router as history_router,
+)
 from app.api.verify import (
     router as verify_router,
 )
@@ -15,7 +18,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:3000"
+        "http://localhost:3000",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -24,6 +27,9 @@ app.add_middleware(
 
 app.include_router(
     verify_router
+)
+app.include_router(
+    history_router
 )
 
 

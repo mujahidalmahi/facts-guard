@@ -124,8 +124,14 @@ async def get_full_result(
         .maybe_single()
         .execute()
     )
+    status = claim.data["status"]
     if not result.data:
-        return None
+        return {
+            "status": status,
+            "jobId": claim.data["job_id"],
+            "claim": claim.data["claim_text"],
+            "createdAt": claim.data["created_at"],
+        }
 
     sources = await asyncio.to_thread(
         lambda: client.table("sources")
@@ -135,6 +141,7 @@ async def get_full_result(
     )
 
     return {
+        "status": claim.data["status"],
         "jobId": claim.data["job_id"],
         "claim": claim.data["claim_text"],
         "createdAt": claim.data["created_at"],
@@ -158,3 +165,23 @@ async def get_full_result(
             for s in sources.data
         ],
     }
+
+
+async def list_claims() -> list[dict[str, Any]]:
+    client = _get_client()
+    claims = await asyncio.to_thread(
+        lambda: client.table("claims")
+        .select("id, job_id, claim_text, status, created_at")
+        .order("created_at", desc=True)
+        .limit(50)
+        .execute()
+    )
+    return [
+        {
+            "jobId": c["job_id"],
+            "claim": c["claim_text"],
+            "status": c["status"],
+            "createdAt": c["created_at"],
+        }
+        for c in claims.data
+    ]

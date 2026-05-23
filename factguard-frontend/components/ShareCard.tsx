@@ -32,16 +32,16 @@ export function ShareCard({
   }
 
   return (
-    <div className="flex items-center gap-3 py-4 border-t border-slate-100">
+    <div className="flex-1 flex items-center gap-3 py-4 border-t border-[var(--card-border)]">
       <div className="flex-1 min-w-0">
-        <p className="text-xs text-slate-400 font-mono truncate" id="share-url-text">
+        <p className="text-xs text-[var(--muted-foreground)] font-mono truncate" id="share-url-text">
           {url || '—'}
         </p>
       </div>
       <button
         onClick={copy}
         disabled={!url}
-        className="shrink-0 text-xs font-semibold text-indigo-600 hover:text-indigo-800 disabled:opacity-40 transition-colors underline-offset-2 hover:underline"
+        className="shrink-0 text-xs font-semibold text-[var(--accent)] hover:text-[var(--accent-hover)] disabled:opacity-40 transition-colors underline-offset-2 hover:underline"
       >
         {copied ? 'Copied ✓' : 'Copy link'}
       </button>

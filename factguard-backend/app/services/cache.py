@@ -42,6 +42,38 @@ async def get_cached_analysis(claim_hash: str) -> dict | None:
         return None
 
 
+HISTORY_CACHE_KEY = "factguard:history:claims"
+HISTORY_CACHE_LIMIT = 50
+
+
+async def get_cached_history() -> list[dict] | None:
+    try:
+        client = _get_client()
+        if client is None:
+            return None
+        data = await asyncio.to_thread(
+            client.lrange, HISTORY_CACHE_KEY, 0, -1
+        )
+        return [json.loads(item) for item in data] if data else []
+    except Exception:
+        return None
+
+
+async def push_claim_to_history(claim_data: dict) -> None:
+    try:
+        client = _get_client()
+        if client is None:
+            return
+        await asyncio.to_thread(
+            client.lpush, HISTORY_CACHE_KEY, json.dumps(claim_data)
+        )
+        await asyncio.to_thread(
+            client.ltrim, HISTORY_CACHE_KEY, 0, HISTORY_CACHE_LIMIT - 1
+        )
+    except Exception:
+        pass
+
+
 async def set_cached_analysis(claim_hash: str, data: dict) -> None:
     try:
         client = _get_client()
