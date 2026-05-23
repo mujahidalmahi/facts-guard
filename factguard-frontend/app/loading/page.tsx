@@ -6,6 +6,7 @@ import {
 } from 'react';
 import {
   useRouter,
+  useSearchParams,
 } from 'next/navigation';
 import {
   motion,
@@ -21,6 +22,13 @@ const steps = [
 export default function LoadingPage() {
   const router =
     useRouter();
+
+  const searchParams =
+    useSearchParams();
+
+  const jobId =
+    searchParams.get('job') ||
+    'demo';
 
   const [step, setStep] =
     useState(0);
@@ -42,7 +50,7 @@ export default function LoadingPage() {
 
           setTimeout(() => {
             router.push(
-              '/result/demo'
+              `/result/${jobId}`
             );
           }, 700);
 
@@ -54,7 +62,7 @@ export default function LoadingPage() {
       clearInterval(
         interval
       );
-  }, [router]);
+  }, [router, jobId]);
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-slate-50 px-6">

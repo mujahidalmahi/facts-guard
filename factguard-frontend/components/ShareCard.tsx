@@ -28,8 +28,10 @@ export function ShareCard({
         range.selectNodeContents(el);
         window.getSelection()?.removeAllRanges();
         window.getSelection()?.addRange(range);
+        document.execCommand('copy');
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
       }
-      setCopied(false);
     }
   }
 

@@ -3,6 +3,11 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+const API_URL =
+  process.env
+    .NEXT_PUBLIC_API_URL ||
+  'http://localhost:8000';
+
 export default function HomePage() {
   const [claim, setClaim] =
     useState('');
@@ -22,7 +27,7 @@ export default function HomePage() {
 
       const res =
         await fetch(
-          'http://localhost:8000/verify',
+          `${API_URL}/verify`,
           {
             method:
               'POST',
@@ -47,17 +52,12 @@ export default function HomePage() {
       const data =
         await res.json();
 
-      localStorage.setItem(
-        'factguard-result',
-        JSON.stringify(
-          data
-        )
-      );
+      const jobId =
+        data.jobId ||
+        'demo';
 
-      // NEW FLOW:
-      // Go to loading screen first
       router.push(
-        '/loading'
+        `/loading?job=${jobId}`
       );
     } catch (error) {
       console.error(

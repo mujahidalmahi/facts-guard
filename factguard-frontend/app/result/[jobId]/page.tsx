@@ -8,7 +8,6 @@ import { ConfidencePill } from '@/components/ConfidencePill';
 import { AgreementMeter } from '@/components/AgreementMeter';
 import { EvidenceTimeline } from '@/components/EvidenceTimeline';
 import { ShareCard } from '@/components/ShareCard';
-
 import {
   Verdict,
   Confidence,
@@ -39,38 +38,54 @@ export default function ResultPage({
     );
 
   useEffect(() => {
-    const stored =
-      localStorage.getItem(
-        'factguard-result'
-      );
+    const API_URL =
+      process.env
+        .NEXT_PUBLIC_API_URL ||
+      'http://localhost:8000';
 
-    if (stored) {
-      const parsed =
-        JSON.parse(stored);
-
-      setData({
-        ...parsed,
-        verdict:
-          parsed.verdict ??
-          'Unverified',
-        confidence:
-          parsed.confidence ??
-          'Low',
+    fetch(
+      `${API_URL}/result/${jobId}`
+    )
+      .then((res) => {
+        if (!res.ok)
+          throw Error();
+        return res.json();
+      })
+      .then((result) => {
+        setData({
+          verdict:
+            result.verdict ??
+            'Unverified',
+          confidence:
+            result.confidence ??
+            'Low',
+          summary:
+            result.summary,
+          supports:
+            result.supports,
+          contradicts:
+            result.contradicts,
+          neutral:
+            result.neutral,
+          sources:
+            result.sources ??
+            [],
+        });
+      })
+      .catch(() => {
+        setData({
+          verdict:
+            'Unverified',
+          confidence: 'Low',
+          summary:
+            'No result found.',
+          supports: 0,
+          contradicts: 0,
+          neutral: 0,
+          sources: [],
+        });
       });
-    } else {
-      setData({
-        verdict:
-          'Unverified',
-        confidence: 'Low',
-        summary:
-          'No result found.',
-        supports: 0,
-        contradicts: 0,
-        neutral: 0,
-        sources: [],
-      });
-    }
-  }, []);
+  }, [jobId]);
 
   if (!data) {
     return (

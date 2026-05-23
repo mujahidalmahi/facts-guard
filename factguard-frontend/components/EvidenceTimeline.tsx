@@ -9,14 +9,14 @@ export function EvidenceTimeline({
 
   return (
     <div className="divide-y divide-slate-100">
-      {sortedSources.map((s) => (
+      {sortedSources.map((s, idx) => (
         <a
           key={s.url}
           href={s.url}
           target="_blank"
           rel="noopener noreferrer"
           className="flex gap-4 py-4 group transition-colors hover:bg-slate-50 -mx-4 px-4 animate-fade-in"
-          style={{ animationDelay: `${sortedSources.indexOf(s) * 80}ms` }}
+          style={{ animationDelay: `${idx * 80}ms` }}
         >
           <div className={`w-0.5 shrink-0 self-stretch rounded-full mt-1
             ${s.stance === 'supports'    ? 'bg-emerald-500' :
