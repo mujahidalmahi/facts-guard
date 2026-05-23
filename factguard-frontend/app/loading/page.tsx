@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  Suspense,
   useEffect,
   useState,
 } from 'react';
@@ -19,7 +20,7 @@ const steps = [
   'Generating trust score...',
 ];
 
-export default function LoadingPage() {
+function LoadingContent() {
   const router =
     useRouter();
 
@@ -121,5 +122,13 @@ export default function LoadingPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function LoadingPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoadingContent />
+    </Suspense>
   );
 }

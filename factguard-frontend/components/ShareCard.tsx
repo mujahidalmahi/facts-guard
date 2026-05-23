@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 interface ShareCardProps {
   jobId: string;
@@ -10,11 +10,7 @@ export function ShareCard({
   jobId,
 }: ShareCardProps) {
   const [copied, setCopied] = useState(false);
-  const [url, setUrl] = useState('');
-
-  useEffect(() => {
-    setUrl(`${window.location.origin}/result/${jobId}`);
-  }, [jobId]);
+  const url = `${window.location.origin}/result/${jobId}`;
 
   async function copy() {
     try {

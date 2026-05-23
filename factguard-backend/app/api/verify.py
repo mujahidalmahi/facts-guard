@@ -4,6 +4,11 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from app.services.cache import (
+    compute_claim_hash,
+    get_cached_analysis,
+    set_cached_analysis,
+)
 from app.services.gemini import (
     analyze_claim,
 )
@@ -31,36 +36,46 @@ async def verify(
 ):
     job_id = str(uuid.uuid4())
 
-    claim_id = create_claim(
+    claim_id = await create_claim(
         payload.claim, job_id
     )
 
-    result = (
-        await analyze_claim(
+    claim_hash = compute_claim_hash(
+        payload.claim
+    )
+    cached = await get_cached_analysis(
+        claim_hash
+    )
+    if cached:
+        result = cached
+    else:
+        result = await analyze_claim(
             payload.claim
         )
-    )
+        await set_cached_analysis(
+            claim_hash, result
+        )
 
-    result_id = save_result(
+    result_id = await save_result(
         claim_id, result
     )
 
-    save_sources(
+    await save_sources(
         result_id,
         result.get("sources", []),
     )
 
-    update_claim_status(
+    await update_claim_status(
         claim_id, "done"
     )
 
     return {
+        **result,
         "jobId": job_id,
         "claim": payload.claim,
         "createdAt": datetime.now(
             timezone.utc
         ).isoformat(),
-        **result,
     }
 
 
@@ -68,7 +83,7 @@ async def verify(
 async def get_result(
     job_id: str,
 ):
-    data = get_full_result(job_id)
+    data = await get_full_result(job_id)
     if not data:
         raise HTTPException(
             status_code=404,

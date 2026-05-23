@@ -69,6 +69,7 @@ Rules:
 - Generate realistic evidence entries
 - stance must be:
   supports | contradicts | neutral
+- relevance must be a number 0-10
 
 JSON format:
 
@@ -88,6 +89,7 @@ JSON format:
       "author": "organization name",
       "date": "2026-05-23",
       "stance": "contradicts",
+      "relevance": 8,
       "summary": "short explanation",
       "quote": "short quote"
     }}

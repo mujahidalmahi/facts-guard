@@ -1,3 +1,4 @@
+import asyncio
 import os
 from pathlib import Path
 from typing import Any
@@ -23,10 +24,10 @@ def _get_client():
     return _supabase
 
 
-def create_claim(claim_text: str, job_id: str) -> str:
+async def create_claim(claim_text: str, job_id: str) -> str:
     client = _get_client()
-    result = (
-        client.table("claims")
+    result = await asyncio.to_thread(
+        lambda: client.table("claims")
         .insert(
             {
                 "claim_text": claim_text,
@@ -39,12 +40,12 @@ def create_claim(claim_text: str, job_id: str) -> str:
     return result.data[0]["id"]
 
 
-def save_result(
+async def save_result(
     claim_id: str, data: dict[str, Any]
 ) -> str:
     client = _get_client()
-    result = (
-        client.table("results")
+    result = await asyncio.to_thread(
+        lambda: client.table("results")
         .insert(
             {
                 "claim_id": claim_id,
@@ -63,7 +64,7 @@ def save_result(
     return result.data[0]["id"]
 
 
-def save_sources(
+async def save_sources(
     result_id: str,
     sources: list[dict[str, Any]],
 ):
@@ -85,27 +86,29 @@ def save_sources(
                 "quote": s.get("quote"),
             }
         )
-    client.table("sources").insert(rows).execute()
+    await asyncio.to_thread(
+        lambda: client.table("sources").insert(rows).execute()
+    )
 
 
-def update_claim_status(
+async def update_claim_status(
     claim_id: str, status: str
 ):
     client = _get_client()
-    (
-        client.table("claims")
+    await asyncio.to_thread(
+        lambda: client.table("claims")
         .update({"status": status})
         .eq("id", claim_id)
         .execute()
     )
 
 
-def get_full_result(
+async def get_full_result(
     job_id: str,
 ) -> dict[str, Any] | None:
     client = _get_client()
-    claim = (
-        client.table("claims")
+    claim = await asyncio.to_thread(
+        lambda: client.table("claims")
         .select("*")
         .eq("job_id", job_id)
         .maybe_single()
@@ -114,8 +117,8 @@ def get_full_result(
     if not claim.data:
         return None
 
-    result = (
-        client.table("results")
+    result = await asyncio.to_thread(
+        lambda: client.table("results")
         .select("*")
         .eq("claim_id", claim.data["id"])
         .maybe_single()
@@ -124,8 +127,8 @@ def get_full_result(
     if not result.data:
         return None
 
-    sources = (
-        client.table("sources")
+    sources = await asyncio.to_thread(
+        lambda: client.table("sources")
         .select("*")
         .eq("result_id", result.data["id"])
         .execute()

@@ -9,6 +9,7 @@ import { AgreementMeter } from '@/components/AgreementMeter';
 import { EvidenceTimeline } from '@/components/EvidenceTimeline';
 import { ShareCard } from '@/components/ShareCard';
 import {
+  Source,
   Verdict,
   Confidence,
 } from '@/types';
@@ -20,7 +21,7 @@ type ResultData = {
   supports?: number;
   contradicts?: number;
   neutral?: number;
-  sources?: any[];
+  sources?: Source[];
 };
 
 export default function ResultPage({
@@ -36,6 +37,7 @@ export default function ResultPage({
     useState<ResultData | null>(
       null
     );
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     const API_URL =
@@ -48,7 +50,11 @@ export default function ResultPage({
     )
       .then((res) => {
         if (!res.ok)
-          throw Error();
+          throw new Error(
+            res.status === 404
+              ? 'Result not found'
+              : 'Server error'
+          );
         return res.json();
       })
       .then((result) => {
@@ -72,20 +78,30 @@ export default function ResultPage({
             [],
         });
       })
-      .catch(() => {
-        setData({
-          verdict:
-            'Unverified',
-          confidence: 'Low',
-          summary:
-            'No result found.',
-          supports: 0,
-          contradicts: 0,
-          neutral: 0,
-          sources: [],
-        });
+      .catch((err) => {
+        setError(true);
+        console.error(err);
       });
   }, [jobId]);
+
+  if (error) {
+    return (
+      <main className="min-h-screen flex flex-col items-center justify-center gap-4 px-6">
+        <p className="text-red-600 text-lg font-semibold">
+          Failed to load result
+        </p>
+        <p className="text-slate-500 text-sm">
+          The claim could not be verified. Please try again.
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-indigo-500 text-white rounded-lg text-sm hover:bg-indigo-600 transition-colors"
+        >
+          Retry
+        </button>
+      </main>
+    );
+  }
 
   if (!data) {
     return (
