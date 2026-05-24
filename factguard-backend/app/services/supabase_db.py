@@ -1,54 +1,14 @@
 from typing import Any
 
-from app.dependencies import get_supabase_service
+from app.exceptions import DatabaseError
 from app.logging_config import get_logger
+from app.services.db import insert, select, update
 from app.utils.constants import STATUS_PROCESSING
 
 logger = get_logger("supabase_db")
 
 
-def _get_client():
-    return get_supabase_service().get_client()
-
-
-async def _db_call(callback):
-    import asyncio
-    return await asyncio.to_thread(callback)
-
-
-async def _insert(table: str, data: dict | list[dict]) -> Any:
-    return await _db_call(lambda: _get_client().table(table).insert(data).execute())
-
-
-async def _update(table: str, data: dict, eq_field: str, eq_value: str) -> Any:
-    return await _db_call(
-        lambda: _get_client().table(table).update(data).eq(eq_field, eq_value).execute()
-    )
-
-
-async def _select(table: str, fields: str = "*", eq_field: str | None = None, eq_value: str | None = None,
-                  maybe_single: bool = False, order: str | None = None, desc: bool = False,
-                  limit: int | None = None, offset: int | None = None, range_start: int | None = None,
-                  range_end: int | None = None) -> Any:
-    def query():
-        q = _get_client().table(table).select(fields)
-        if eq_field and eq_value is not None:
-            q = q.eq(eq_field, eq_value)
-        if order:
-            q = q.order(order, desc=desc)
-        if limit is not None:
-            q = q.limit(limit)
-        if range_start is not None and range_end is not None:
-            q = q.range(range_start, range_end)
-        if offset is not None:
-            q = q.offset(offset)
-        if maybe_single:
-            q = q.maybe_single()
-        return q.execute()
-    return await _db_call(query)
-
-
-def _source_to_insert(s: dict, result_id: str) -> dict:
+def _source_toinsert(s: dict, result_id: str) -> dict:
     return {
         "result_id": result_id,
         "url": s.get("url", ""),
@@ -64,11 +24,11 @@ def _source_to_insert(s: dict, result_id: str) -> dict:
 
 def _source_to_response(s: Any) -> dict:
     return {
-        "url": s["url"],
-        "title": s["title"],
+        "url": s.get("url", ""),
+        "title": s.get("title", ""),
         "author": s.get("author"),
         "date": s.get("published"),
-        "stance": s["stance"],
+        "stance": s.get("stance", "neutral"),
         "relevance": s.get("relevance", 5),
         "summary": s.get("summary", ""),
         "quote": s.get("quote"),
@@ -76,88 +36,115 @@ def _source_to_response(s: Any) -> dict:
 
 
 async def create_claim(claim_text: str, job_id: str) -> str:
-    result = await _insert("claims", {
-        "claim_text": claim_text,
-        "job_id": job_id,
-        "status": STATUS_PROCESSING,
-    })
-    claim_id = result.data[0]["id"]
-    logger.debug(f"Claim created: {claim_id}")
-    return claim_id
+    try:
+        result = await insert("claims", {
+            "claim_text": claim_text,
+            "job_id": job_id,
+            "status": STATUS_PROCESSING,
+        })
+        claim_id = result.data[0]["id"]
+        logger.debug(f"Claim created: {claim_id}")
+        return claim_id
+    except Exception as e:
+        logger.error(f"Failed to create claim: {type(e).__name__}: {e}")
+        raise DatabaseError(f"Failed to create claim: {e}")
 
 
 async def save_result(claim_id: str, data: dict[str, Any]) -> str:
-    result = await _insert("results", {
-        "claim_id": claim_id,
-        "verdict": data["verdict"],
-        "confidence": data["confidence"],
-        "summary": data["summary"],
-        "supports": data.get("supports", 0),
-        "contradicts": data.get("contradicts", 0),
-        "neutral": data.get("neutral", 0),
-    })
-    result_id = result.data[0]["id"]
-    logger.debug(f"Result saved: {result_id}")
-    return result_id
+    try:
+        result = await insert("results", {
+            "claim_id": claim_id,
+            "verdict": data.get("verdict", "Unverified"),
+            "confidence": data.get("confidence", "Low"),
+            "summary": data.get("summary", ""),
+            "supports": data.get("supports", 0),
+            "contradicts": data.get("contradicts", 0),
+            "neutral": data.get("neutral", 0),
+        })
+        result_id = result.data[0]["id"]
+        logger.debug(f"Result saved: {result_id}")
+        return result_id
+    except Exception as e:
+        logger.error(f"Failed to save result: {type(e).__name__}: {e}")
+        raise DatabaseError(f"Failed to save result: {e}")
 
 
 async def save_sources(result_id: str, sources: list[dict[str, Any]]):
     if not sources:
         logger.debug("No sources to save")
         return
-    rows = [_source_to_insert(s, result_id) for s in sources]
-    await _insert("sources", rows)
+    rows = [_source_toinsert(s, result_id) for s in sources]
+    await insert("sources", rows)
     logger.debug(f"Saved {len(rows)} sources")
 
 
 async def update_claim_status(claim_id: str, status: str):
-    await _update("claims", {"status": status}, "id", claim_id)
+    await update("claims", {"status": status}, "id", claim_id)
     logger.debug(f"Claim {claim_id} status updated to: {status}")
 
 
 async def get_full_result(job_id: str) -> dict[str, Any] | None:
-    claim_response = await _select("claims", eq_field="job_id", eq_value=job_id, maybe_single=True)
-    if not claim_response.data:
+    try:
+        claim_response = await select("claims", eq_field="job_id", eq_value=job_id, maybe_single=True)
+    except Exception as e:
+        logger.error(f"Failed to query claim for job_id {job_id}: {type(e).__name__}: {e}")
+        return None
+
+    if not claim_response or not claim_response.data:
         logger.warning(f"Claim not found for job_id: {job_id}")
         return None
 
     claim = claim_response.data
-    claim_id = claim["id"]
-    status = claim["status"]
+    claim_id = claim.get("id")
+    if not claim_id:
+        logger.warning(f"Claim has no id for job_id: {job_id}")
+        return None
 
-    result_response = await _select("results", eq_field="claim_id", eq_value=claim_id, maybe_single=True)
-    if not result_response.data:
+    status = claim.get("status", "processing")
+
+    try:
+        result_response = await select("results", eq_field="claim_id", eq_value=claim_id, maybe_single=True)
+    except Exception as e:
+        logger.error(f"Failed to query result for claim {claim_id}: {type(e).__name__}: {e}")
+        return None
+
+    if not result_response or not result_response.data:
         logger.debug(f"Result not yet available for claim: {claim_id}")
         return {
             "status": status,
-            "jobId": claim["job_id"],
-            "claim": claim["claim_text"],
-            "createdAt": claim["created_at"],
+            "jobId": claim.get("job_id", job_id),
+            "claim": claim.get("claim_text", ""),
+            "createdAt": claim.get("created_at"),
         }
 
     result = result_response.data
-    sources_response = await _select("sources", eq_field="result_id", eq_value=result["id"])
-    sources_data = sources_response.data or []
+    try:
+        sources_response = await select("sources", eq_field="result_id", eq_value=result["id"])
+    except Exception as e:
+        logger.error(f"Failed to query sources for result {result['id']}: {type(e).__name__}: {e}")
+        sources_data = []
+    else:
+        sources_data = sources_response.data or []
 
     logger.debug(f"Full result retrieved for job_id: {job_id}")
 
     return {
         "status": status,
-        "jobId": claim["job_id"],
-        "claim": claim["claim_text"],
-        "createdAt": claim["created_at"],
-        "verdict": result["verdict"],
-        "confidence": result["confidence"],
-        "summary": result["summary"],
-        "supports": result["supports"],
-        "contradicts": result["contradicts"],
-        "neutral": result["neutral"],
+        "jobId": claim.get("job_id", job_id),
+        "claim": claim.get("claim_text", ""),
+        "createdAt": claim.get("created_at"),
+        "verdict": result.get("verdict", "Unverified"),
+        "confidence": result.get("confidence", "Low"),
+        "summary": result.get("summary", ""),
+        "supports": result.get("supports", 0),
+        "contradicts": result.get("contradicts", 0),
+        "neutral": result.get("neutral", 0),
         "sources": [_source_to_response(s) for s in sources_data],
     }
 
 
 async def list_claims() -> list[dict[str, Any]]:
-    claims_response = await _select(
+    claims_response = await select(
         "claims",
         fields="id, job_id, claim_text, status, created_at",
         order="created_at",
@@ -176,7 +163,7 @@ async def list_claims() -> list[dict[str, Any]]:
 
 
 async def get_recent_results(limit: int = 10, offset: int = 0) -> list[dict[str, Any]]:
-    response = await _select(
+    response = await select(
         "claims",
         eq_field="status",
         eq_value="done",

@@ -2,10 +2,22 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 
+from app.config import settings
 from app.exceptions import FactGuardException
 from app.logging_config import get_logger
 
 logger = get_logger("exception_handler")
+
+CORS_HEADERS = {
+    "Access-Control-Allow-Origin": settings.FRONTEND_URL,
+    "Access-Control-Allow-Credentials": "true",
+    "Access-Control-Allow-Methods": "*",
+    "Access-Control-Allow-Headers": "*",
+}
+
+
+def _cors_response(status_code: int, content: dict) -> JSONResponse:
+    return JSONResponse(status_code=status_code, content=content, headers=CORS_HEADERS)
 
 
 async def factguard_exception_handler(
@@ -15,7 +27,7 @@ async def factguard_exception_handler(
         f"FactGuard exception: {exc.error_code}",
     )
 
-    return JSONResponse(
+    return _cors_response(
         status_code=exc.status_code,
         content={
             "error": exc.error_code,
@@ -40,7 +52,7 @@ async def validation_error_handler(
 
     logger.warning(f"Validation error on {request.url.path}")
 
-    return JSONResponse(
+    return _cors_response(
         status_code=422,
         content={
             "error": "VALIDATION_ERROR",
@@ -57,7 +69,7 @@ async def general_exception_handler(
         f"Unexpected error on {request.url.path}",
     )
 
-    return JSONResponse(
+    return _cors_response(
         status_code=500,
         content={
             "error": "INTERNAL_SERVER_ERROR",

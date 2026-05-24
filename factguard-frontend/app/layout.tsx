@@ -1,7 +1,8 @@
 import './globals.css';
 import { Geist, Geist_Mono } from 'next/font/google';
-import Script from 'next/script';
 import { ThemeProvider } from '@/components/ThemeProvider';
+import { ThemeScript } from '@/components/ThemeScript';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Nav } from '@/components/Nav';
 import type { Metadata } from 'next';
 
@@ -21,16 +22,12 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`} suppressHydrationWarning>
       <body className="font-sans">
-        <Script
-          id="theme-init"
-          strategy="beforeInteractive"
-          dangerouslySetInnerHTML={{
-            __html: `(function(){var t=localStorage.getItem('theme');if(t==='light'||t==='dark'){if(t==='dark')document.documentElement.classList.add('dark')}else{document.documentElement.classList.add('dark')}})()`,
-          }}
-        />
+        <ThemeScript />
         <ThemeProvider>
           <Nav />
-          {children}
+          <ErrorBoundary>
+            {children}
+          </ErrorBoundary>
         </ThemeProvider>
       </body>
     </html>

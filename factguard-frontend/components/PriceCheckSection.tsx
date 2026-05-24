@@ -69,6 +69,7 @@ export function PriceCheckSection() {
         value={product}
         onChange={(e) => setProduct(e.target.value)}
         placeholder="Enter a product..."
+        maxLength={500}
         className="w-full mt-6 rounded-2xl border border-[var(--card-border)] p-4 text-base outline-none focus:ring-2 focus:ring-[var(--accent)] bg-[var(--card)] text-[var(--foreground)] placeholder-[var(--muted-foreground)]"
       />
 

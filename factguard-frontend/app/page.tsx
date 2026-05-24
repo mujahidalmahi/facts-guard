@@ -1,7 +1,6 @@
 'use client';
 
 import {
-  useLayoutEffect,
   useState,
 } from 'react';
 import { useRouter } from 'next/navigation';
@@ -20,20 +19,16 @@ export default function HomePage() {
   const [loading, setLoading] =
     useState(false);
   const [showSplash, setShowSplash] =
-    useState(false);
+    useState(() => {
+      try {
+        return !sessionStorage.getItem('splashShown');
+      } catch {
+        return false;
+      }
+    });
 
   const router =
     useRouter();
-
-  useLayoutEffect(() => {
-    const shown =
-      sessionStorage.getItem(
-        'splashShown'
-      );
-    if (!shown) {
-      setShowSplash(true);
-    }
-  }, []);
 
   async function handleAnalyse() {
     if (!claim.trim())

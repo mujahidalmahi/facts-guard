@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Shield, Clock, ArrowRight, AlertCircle } from 'lucide-react';
+import { HistorySkeleton } from '@/components/Skeleton';
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -47,8 +48,6 @@ export default function HistoryPage() {
     useState(false);
 
   useEffect(() => {
-    setLoading(true);
-    setError(false);
     fetch(`${API_URL}/history`)
       .then((res) => {
         if (!res.ok)
@@ -79,11 +78,7 @@ export default function HistoryPage() {
         Previously analysed claims
       </p>
 
-      {loading && (
-        <p className="text-[var(--muted-foreground)]">
-          Loading...
-        </p>
-      )}
+      {loading && <HistorySkeleton />}
 
       {error && (
         <div className="text-center py-20">

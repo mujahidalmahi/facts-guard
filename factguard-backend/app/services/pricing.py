@@ -1,9 +1,5 @@
 from app.logging_config import get_logger
-from app.services.supabase_db import (
-    _insert,
-    _select,
-    _update,
-)
+from app.services.db import insert, select, update
 from app.utils.constants import (
     PRICING_PROGRESS_ANALYZING,
     PRICING_PROGRESS_SAVING,
@@ -49,66 +45,89 @@ def _listing_to_insert(l: dict, query_id: str) -> dict:
 
 def _listing_to_response(l: any) -> dict:
     return {
-        "title": l["title"],
+        "title": l.get("title", ""),
         "price": l.get("price"),
         "currency": l.get("currency", "USD"),
-        "merchant": l["merchant"],
-        "trustLevel": get_trust_level(l["merchant"]),
-        "url": l["url"],
+        "merchant": l.get("merchant", ""),
+        "trustLevel": get_trust_level(l.get("merchant", "")),
+        "url": l.get("url", ""),
         "image": l.get("image"),
         "condition": l.get("condition"),
     }
 
 
 async def create_query(product_name: str, job_id: str) -> str:
-    result = await _insert("product_queries", {
-        "product_name": product_name,
-        "job_id": job_id,
-        "status": STATUS_PROCESSING,
-    })
-    query_id = result.data[0]["id"]
-    logger.debug(f"Price query created: {query_id}")
-    return query_id
+    try:
+        result = await insert("product_queries", {
+            "product_name": product_name,
+            "job_id": job_id,
+            "status": STATUS_PROCESSING,
+        })
+        query_id = result.data[0]["id"]
+        logger.debug(f"Price query created: {query_id}")
+        return query_id
+    except Exception as e:
+        logger.error(f"Failed to create price query: {type(e).__name__}: {e}")
+        raise
 
 
 async def save_listings(query_id: str, listings: list[dict]):
     if not listings:
         logger.debug("No listings to save")
         return
-    rows = [_listing_to_insert(l, query_id) for l in listings]
-    await _insert("product_listings", rows)
-    logger.debug(f"Saved {len(rows)} listings")
+    try:
+        rows = [_listing_to_insert(l, query_id) for l in listings]
+        await insert("product_listings", rows)
+        logger.debug(f"Saved {len(rows)} listings")
+    except Exception as e:
+        logger.error(f"Failed to save listings: {type(e).__name__}: {e}")
 
 
 async def update_query_status(query_id: str, status: str):
-    await _update("product_queries", {"status": status}, "id", query_id)
-    logger.debug(f"Query {query_id} status updated to: {status}")
+    try:
+        await update("product_queries", {"status": status}, "id", query_id)
+        logger.debug(f"Query {query_id} status updated to: {status}")
+    except Exception as e:
+        logger.error(f"Failed to update query status: {type(e).__name__}: {e}")
 
 
 async def get_full_price_result(job_id: str) -> dict | None:
-    query_response = await _select(
-        "product_queries", eq_field="job_id", eq_value=job_id, maybe_single=True
-    )
-    if not query_response.data:
+    try:
+        query_response = await select(
+            "product_queries", eq_field="job_id", eq_value=job_id, maybe_single=True
+        )
+    except Exception as e:
+        logger.error(f"Failed to query price result for job_id {job_id}: {type(e).__name__}: {e}")
+        return None
+
+    if not query_response or not query_response.data:
         logger.warning(f"Price query not found for job_id: {job_id}")
         return None
 
     query = query_response.data
-    query_id = query["id"]
-    status = query["status"]
+    query_id = query.get("id")
+    if not query_id:
+        logger.warning(f"Price query has no id for job_id: {job_id}")
+        return None
+
+    status = query.get("status", STATUS_PROCESSING)
 
     if status == STATUS_PROCESSING:
         return {
             "status": STATUS_PROCESSING,
-            "jobId": query["job_id"],
-            "product": query["product_name"],
-            "createdAt": query["created_at"],
+            "jobId": query.get("job_id", job_id),
+            "product": query.get("product_name", ""),
+            "createdAt": query.get("created_at"),
         }
 
-    listings_response = await _select(
-        "product_listings", eq_field="query_id", eq_value=query_id
-    )
-    listings_data = listings_response.data or []
+    try:
+        listings_response = await select(
+            "product_listings", eq_field="query_id", eq_value=query_id
+        )
+        listings_data = listings_response.data or []
+    except Exception as e:
+        logger.error(f"Failed to query listings for query {query_id}: {type(e).__name__}: {e}")
+        listings_data = []
 
     variants = query.get("variants_data")
     if isinstance(variants, list):
@@ -118,9 +137,9 @@ async def get_full_price_result(job_id: str) -> dict | None:
 
     return {
         "status": status,
-        "jobId": query["job_id"],
-        "product": query["product_name"],
-        "createdAt": query["created_at"],
+        "jobId": query.get("job_id", job_id),
+        "product": query.get("product_name", ""),
+        "createdAt": query.get("created_at"),
         "listings": [_listing_to_response(l) for l in listings_data],
         "variants": variants if isinstance(variants, list) else [],
     }
@@ -184,7 +203,7 @@ async def process_price_check(query_id: str, product_name: str, job_id: str):
 
         await set_progress(job_id, PRICING_PROGRESS_SAVING)
         await save_listings(query_id, listings)
-        await _update(
+        await update(
             "product_queries",
             {"status": STATUS_DONE, "variants_data": variants},
             "id",

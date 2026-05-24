@@ -1,15 +1,5 @@
 import type { ProductListing } from '@/types';
 
-const TRUST_COLORS: Record<
-  string,
-  string
-> = {
-  High: 'text-green-500',
-  Medium:
-    'text-yellow-500',
-  Low: 'text-red-500',
-};
-
 const TRUST_LABELS: Record<
   string,
   string

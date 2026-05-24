@@ -15,6 +15,7 @@ import {
   Verdict,
   Confidence,
 } from '@/types';
+import { ResultSkeleton } from '@/components/Skeleton';
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -240,17 +241,24 @@ export default function ResultPage({
   }
 
   if (!data) {
-    return (
-      <main className="min-h-[calc(100vh-3.5rem)] flex items-center justify-center">
-        <p className="text-[var(--muted-foreground)]">
-          Loading result...
-        </p>
-      </main>
-    );
+    return <ResultSkeleton />;
   }
 
   return (
     <main className="max-w-3xl mx-auto px-4 py-10 space-y-8">
+      <motion.div
+        initial={{ opacity: 0, y: -12 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="rounded-xl border border-[var(--card-border)] bg-[var(--card)] p-5 shadow-sm"
+      >
+        <p className="text-xs text-[var(--muted-foreground)] uppercase tracking-widest font-semibold mb-1">
+          Claim
+        </p>
+        <p className="text-lg font-medium text-[var(--foreground)]">
+          &ldquo;{data.claim}&rdquo;
+        </p>
+      </motion.div>
+
       <div className="flex flex-wrap items-center gap-3">
         <motion.div
           initial={{

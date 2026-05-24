@@ -48,11 +48,7 @@ export function ThemeProvider({
   children: React.ReactNode;
 }) {
   const [theme, setTheme] =
-    useState<Theme>('dark');
-
-  useEffect(() => {
-    setTheme(getInitialTheme());
-  }, []);
+    useState<Theme>(getInitialTheme);
 
   useEffect(() => {
     document.documentElement.classList.toggle(
