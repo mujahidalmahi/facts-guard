@@ -1,6 +1,7 @@
 'use client';
 
 import { use, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Download } from 'lucide-react';
 
@@ -139,6 +140,7 @@ export default function ResultPage({
   }>;
 }) {
   const { jobId } = use(params);
+  const router = useRouter();
 
   const [data, setData] =
     useState<ResultData | null>(
@@ -172,6 +174,16 @@ export default function ResultPage({
             .aborted
         )
           return;
+        if (
+          result.status &&
+          result.status ===
+            'processing'
+        ) {
+          router.push(
+            `/loading?job=${jobId}`
+          );
+          return;
+        }
         setData({
           claim:
             result.claim,
@@ -206,7 +218,7 @@ export default function ResultPage({
 
     return () =>
       controller.abort();
-  }, [jobId]);
+  }, [jobId, router]);
 
   if (error) {
     return (

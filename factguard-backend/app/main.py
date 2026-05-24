@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 
 from app.api.history import router as history_router
+from app.api.pricing import router as pricing_router
 from app.api.verify import router as verify_router
 from app.config import settings
 from app.exceptions import FactGuardException
@@ -33,6 +34,7 @@ app.add_exception_handler(RequestValidationError, validation_error_handler)
 app.add_exception_handler(Exception, general_exception_handler)
 
 app.include_router(verify_router)
+app.include_router(pricing_router)
 app.include_router(history_router)
 
 

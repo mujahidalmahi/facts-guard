@@ -54,6 +54,52 @@ class HealthCheckResponse(BaseModel):
     timestamp: str = Field(..., description="Current timestamp")
 
 
+class ProductListingResponse(BaseModel):
+    title: str = Field(..., description="Product title")
+    price: Optional[float] = Field(None, description="Price amount")
+    currency: str = Field("USD", description="Currency code")
+    merchant: str = Field(..., description="Merchant name")
+    trustLevel: str = Field("Medium", description="Merchant trust level (High/Medium/Low)")
+    url: str = Field(..., description="Product URL")
+    image: Optional[str] = Field(None, description="Product image URL")
+    condition: Optional[str] = Field(None, description="Product condition")
+
+
+class ProductVariantResponse(BaseModel):
+    model: str = Field(..., description="Model/variant name")
+    specs: Optional[str] = Field(None, description="Key specifications")
+    priceRange: str = Field(..., description="Price range across listings")
+
+
+class PriceCheckRequest(BaseModel):
+    product: str = Field(
+        ...,
+        min_length=3,
+        max_length=500,
+        description="Product name to compare prices for",
+    )
+
+    @field_validator("product")
+    @classmethod
+    def validate_product(cls, v: str) -> str:
+        if contains_sql_injection_pattern(v):
+            raise ValueError("Product name contains invalid characters or patterns")
+        return v
+
+
+class PriceCheckResponse(BaseModel):
+    status: str = Field(..., description="Status of the price check")
+    jobId: str = Field(..., description="Unique job ID for tracking")
+    product: Optional[str] = Field(None, description="The original product name")
+    createdAt: Optional[str] = Field(None, description="ISO-8601 timestamp")
+    listings: list[ProductListingResponse] = Field(
+        default_factory=list, description="Product listings from various merchants"
+    )
+    variants: list[ProductVariantResponse] = Field(
+        default_factory=list, description="Detected product models/variants"
+    )
+
+
 class ErrorResponse(BaseModel):
     error: str = Field(..., description="Error code")
     message: str = Field(..., description="Human-readable error message")

@@ -26,10 +26,10 @@ const PROGRESS_ICONS: Record<
   string,
   string
 > = {
-  'Checking cache...': '🔍',
-  'Searching DuckDuckGo...':
-    '🌐',
-  'Analyzing with AI...': '🤖',
+  'Searching for prices...':
+    '🔍',
+  'Analyzing product data...':
+    '📊',
   'Saving results...': '💾',
   Failed: '❌',
 };
@@ -66,14 +66,14 @@ function LoadingContent() {
           intervalRef.current!
         );
         router.push(
-          `/result/${jobId}`
+          `/price-result/${jobId}`
         );
         return;
       }
 
       try {
         const res = await fetch(
-          `${API_URL}/result/${jobId}`
+          `${API_URL}/price-result/${jobId}`
         );
         if (!res.ok) return;
 
@@ -94,7 +94,7 @@ function LoadingContent() {
             'processing'
         ) {
           router.push(
-            `/result/${jobId}`
+            `/price-result/${jobId}`
           );
         }
       } catch {
@@ -127,16 +127,15 @@ function LoadingContent() {
     ] || '⏳';
 
   const stepIndex = [
-    'Checking cache...',
-    'Searching DuckDuckGo...',
-    'Analyzing with AI...',
+    'Searching for prices...',
+    'Analyzing product data...',
     'Saving results...',
   ].indexOf(progress);
 
   const pct =
     stepIndex >= 0
       ? ((stepIndex + 1) /
-          4) *
+          3) *
         100
       : 50;
 
@@ -172,9 +171,8 @@ function LoadingContent() {
 
         <p className="mt-3 text-[var(--muted-foreground)]">
           FactGuard is
-          verifying the claim
-          using AI evidence
-          analysis
+          comparing prices
+          across top retailers
         </p>
 
         <div className="mt-8 h-2 bg-[var(--muted)] rounded-full overflow-hidden">
@@ -193,7 +191,7 @@ function LoadingContent() {
   );
 }
 
-export default function LoadingPage() {
+export default function PriceLoadingPage() {
   return (
     <Suspense fallback={null}>
       <LoadingContent />

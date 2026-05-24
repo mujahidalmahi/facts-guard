@@ -52,7 +52,7 @@ stance TEXT NOT NULL
 CHECK (stance IN ('supports','contradicts','neutral')),
 relevance SMALLINT CHECK (relevance BETWEEN 0 AND 10),
 summary TEXT,
-quote TEXT
+  quote TEXT
 );
 -- nn Indexes nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn
 CREATE INDEX IF NOT EXISTS idx_claims_hash

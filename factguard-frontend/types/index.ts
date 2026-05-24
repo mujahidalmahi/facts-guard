@@ -33,3 +33,29 @@ export interface VerifyResult {
   sources: Source[];
   createdAt: string;
 }
+
+export interface ProductListing {
+  title: string;
+  price: number | null;
+  currency: string;
+  merchant: string;
+  trustLevel: string;
+  url: string;
+  image: string | null;
+  condition: string | null;
+}
+
+export interface ProductVariant {
+  model: string;
+  specs: string | null;
+  priceRange: string;
+}
+
+export interface PriceCheckResult {
+  status: string;
+  jobId: string;
+  product: string;
+  createdAt: string;
+  listings: ProductListing[];
+  variants: ProductVariant[];
+}
