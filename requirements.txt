@@ -17,7 +17,7 @@ google-generativeai==0.8.6
 googleapis-common-protos==1.75.0
 gotrue==2.12.4
 grpcio==1.80.0
-grpcio-status==1.71.2
+grpcio-status==2.30.3
 h11==0.16.0
 h2==4.3.0
 hpack==4.1.0
