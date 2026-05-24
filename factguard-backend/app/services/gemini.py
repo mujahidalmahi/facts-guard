@@ -1,59 +1,70 @@
-import os
-import json
 import asyncio
+import json
+from datetime import datetime, timezone
 
-import google.generativeai as genai
-from google.api_core.exceptions import ResourceExhausted
-from pathlib import Path
+from google.api_core.exceptions import (
+    InternalServerError,
+    ResourceExhausted,
+    ServiceUnavailable,
+)
 
-from dotenv import load_dotenv
+from app.dependencies import get_gemini_service
+from app.logging_config import get_logger
+from app.services.cache import set_progress
+from app.utils.search import search_claim
 
-load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
+logger = get_logger("gemini")
 
-API_KEYS = [
-    k.strip()
-    for k in os.getenv(
-        "GEMINI_API_KEYS", ""
-    ).split(",")
-    if k.strip()
-]
+FALLBACK_RESPONSE = {
+    "verdict": "Unverified",
+    "confidence": "Low",
+    "summary": "Could not analyze claim. Please try again.",
+    "supports": 0,
+    "contradicts": 0,
+    "neutral": 0,
+    "sources": [],
+    "_is_fallback": True,
+}
 
-if not API_KEYS:
-    raise RuntimeError(
-        "GEMINI_API_KEYS must be set in .env"
-    )
-
-_current_key = 0
-_model = None
-
-
-def _configure(key: str):
-    global _model
-    genai.configure(api_key=key)
-    _model = genai.GenerativeModel(
-        "gemini-2.5-flash"
-    )
+REQUIRED_KEYS = {"verdict", "confidence", "summary", "supports", "contradicts", "neutral"}
 
 
-def _next_key():
-    global _current_key
-    key = API_KEYS[_current_key % len(API_KEYS)]
-    _current_key += 1
-    return key
+def _validate_response(result: dict) -> bool:
+    missing = REQUIRED_KEYS - set(result.keys())
+    if missing:
+        logger.warning(f"LLM response missing required keys: {missing}")
+        return False
+    return True
 
 
-def _get_model():
-    global _model
-    if _model is None:
-        _configure(_next_key())
-    return _model
+async def analyze_claim(claim: str, job_id: str | None = None) -> dict:
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
+    if job_id:
+        await set_progress(job_id, "Searching DuckDuckGo...")
+    search_results = await search_claim(claim)
+    search_context = ""
+    if search_results:
+        lines = []
+        for i, r in enumerate(search_results, 1):
+            lines.append(f"{i}. \"{r['title']}\"")
+            lines.append(f"   URL: {r['url']}")
+            lines.append(f"   Snippet: {r['snippet']}")
+        search_context = "\n".join(lines)
 
-async def analyze_claim(
-    claim: str,
-):
+    search_section = f"""
+Use these live web search results about this claim as your primary evidence.
+Base your analysis on these real sources. Do NOT fabricate sources.
+
+Web Search Results:
+{search_context or "No web search results found. Use your best judgment."}
+"""
+
     prompt = f"""
 You are FactGuard, an AI misinformation detection system.
+Today's date is {today}.
+
+{search_section}
 
 Analyze the following claim carefully.
 
@@ -66,7 +77,7 @@ Rules:
 - Do not include markdown
 - Do not wrap response in ```json
 - Be concise
-- Generate realistic evidence entries
+- Use the web search results above as evidence sources
 - stance must be:
   supports | contradicts | neutral
 - relevance must be a number 0-10
@@ -87,7 +98,7 @@ JSON format:
       "title": "source title",
       "url": "https://example.com",
       "author": "organization name",
-      "date": "2026-05-23",
+      "date": "{today}",
       "stance": "contradicts",
       "relevance": 8,
       "summary": "short explanation",
@@ -97,50 +108,46 @@ JSON format:
 }}
 """
 
-    last_error = None
+    gemini_service = get_gemini_service()
+    max_retries = len(gemini_service.api_keys)
 
-    for _ in range(len(API_KEYS)):
+    for attempt in range(max_retries):
         try:
-            model = _get_model()
-            response = await asyncio.to_thread(
-                model.generate_content, prompt
+            if job_id:
+                await set_progress(job_id, "Analyzing with AI...")
+            model = gemini_service.get_model()
+            response = await asyncio.to_thread(model.generate_content, prompt)
+
+            text = (
+                response.text
+                .replace("```json", "")
+                .replace("```", "")
+                .strip()
             )
-        except ResourceExhausted as e:
-            last_error = e
-            _configure(_next_key())
+
+            result = json.loads(text)
+
+            if not _validate_response(result):
+                return dict(FALLBACK_RESPONSE)
+
+            logger.info("Claim analysis completed successfully")
+            return result
+
+        except (ResourceExhausted, InternalServerError, ServiceUnavailable):
+            remaining = max_retries - attempt - 1
+            logger.warning(f"Gemini API key exhausted (attempt {attempt + 1}/{max_retries}), rotating to next key")
+            if remaining > 0:
+                gemini_service.rotate_key()
+                await asyncio.sleep(1)
             continue
 
-        text = (
-            response.text
-            .replace("```json", "")
-            .replace("```", "")
-            .strip()
-        )
+        except json.JSONDecodeError as e:
+            logger.warning(f"JSON parsing failed: {str(e)}, returning default")
+            return dict(FALLBACK_RESPONSE)
 
-        try:
-            return json.loads(text)
-        except Exception:
-            return {
-                "verdict":
-                    "Unverified",
-                "confidence":
-                    "Low",
-                "summary":
-                    "Could not analyze claim.",
-                "supports": 0,
-                "contradicts": 0,
-                "neutral": 0,
-                "sources": [],
-            }
+        except Exception as e:
+            logger.error(f"Unexpected error during analysis: {str(e)}")
+            return dict(FALLBACK_RESPONSE)
 
-    return {
-        "verdict": "Unverified",
-        "confidence": "Low",
-        "summary":
-            f"All API keys exhausted. "
-            f"{last_error}",
-        "supports": 0,
-        "contradicts": 0,
-        "neutral": 0,
-        "sources": [],
-    }
+    logger.error("All API key retries exhausted")
+    return {**FALLBACK_RESPONSE, "summary": "All API keys exhausted. Please try again later."}

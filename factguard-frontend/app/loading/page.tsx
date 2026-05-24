@@ -20,10 +20,22 @@ const API_URL =
   'http://localhost:8000';
 
 const POLL_INTERVAL = 1500;
+const POLL_LIMIT = 30;
+
+const PROGRESS_ICONS: Record<
+  string,
+  string
+> = {
+  'Checking cache...': '🔍',
+  'Searching DuckDuckGo...':
+    '🌐',
+  'Analyzing with AI...': '🤖',
+  'Saving results...': '💾',
+  Failed: '❌',
+};
 
 function LoadingContent() {
-  const router =
-    useRouter();
+  const router = useRouter();
 
   const searchParams =
     useSearchParams();
@@ -37,38 +49,44 @@ function LoadingContent() {
       typeof setInterval
     > | null>(null);
 
-  const [messageIdx, setMessageIdx] =
-    useState(0);
+  const attemptRef =
+    useRef(0);
 
-  const messages = [
-    'Analyzing claim...',
-    'Checking sources...',
-    'Evaluating evidence...',
-    'Generating trust score...',
-  ];
+  const [progress, setProgress] =
+    useState('Processing...');
 
   useEffect(() => {
-    const msgInterval =
-      setInterval(() => {
-        setMessageIdx(
-          (prev) =>
-            prev <
-            messages.length - 1
-              ? prev + 1
-              : prev
-        );
-      }, 4000);
-
     async function poll() {
+      attemptRef.current++;
+      if (
+        attemptRef.current >
+        POLL_LIMIT
+      ) {
+        clearInterval(
+          intervalRef.current!
+        );
+        router.push(
+          `/result/${jobId}`
+        );
+        return;
+      }
+
       try {
-        const res =
-          await fetch(
-            `${API_URL}/result/${jobId}`
-          );
+        const res = await fetch(
+          `${API_URL}/result/${jobId}`
+        );
         if (!res.ok) return;
 
         const data =
           await res.json();
+
+        if (
+          data.progress
+        ) {
+          setProgress(
+            data.progress
+          );
+        }
 
         if (
           data.status &&
@@ -85,14 +103,14 @@ function LoadingContent() {
     }
 
     intervalRef.current =
-      setInterval(poll, POLL_INTERVAL);
+      setInterval(
+        poll,
+        POLL_INTERVAL
+      );
 
     poll();
 
     return () => {
-      clearInterval(
-        msgInterval
-      );
       if (
         intervalRef.current
       ) {
@@ -103,6 +121,25 @@ function LoadingContent() {
     };
   }, [router, jobId]);
 
+  const icon =
+    PROGRESS_ICONS[
+      progress
+    ] || '⏳';
+
+  const stepIndex = [
+    'Checking cache...',
+    'Searching DuckDuckGo...',
+    'Analyzing with AI...',
+    'Saving results...',
+  ].indexOf(progress);
+
+  const pct =
+    stepIndex >= 0
+      ? ((stepIndex + 1) /
+          4) *
+        100
+      : 50;
+
   return (
     <main className="min-h-[calc(100vh-3.5rem)] flex items-center justify-center bg-[var(--background)] px-6">
       <div className="text-center max-w-md w-full">
@@ -111,17 +148,15 @@ function LoadingContent() {
             rotate: 360,
           }}
           transition={{
-            repeat:
-              Infinity,
+            repeat: Infinity,
             duration: 1.4,
-            ease:
-              'linear',
+            ease: 'linear',
           }}
           className="mx-auto h-16 w-16 rounded-full border-4 border-[var(--card-border)] border-t-[var(--accent)]"
         />
 
         <motion.h1
-          key={messageIdx}
+          key={progress}
           initial={{
             opacity: 0,
             y: 8,
@@ -132,18 +167,14 @@ function LoadingContent() {
           }}
           className="mt-8 text-2xl font-semibold text-[var(--foreground)]"
         >
-          {
-            messages[
-              messageIdx
-            ]
-          }
+          {icon} {progress}
         </motion.h1>
 
         <p className="mt-3 text-[var(--muted-foreground)]">
           FactGuard is
-          verifying the
-          claim using AI
-          evidence analysis
+          verifying the claim
+          using AI evidence
+          analysis
         </p>
 
         <div className="mt-8 h-2 bg-[var(--muted)] rounded-full overflow-hidden">
@@ -152,12 +183,7 @@ function LoadingContent() {
               width: '0%',
             }}
             animate={{
-              width: `${
-                ((messageIdx +
-                  1) /
-                  messages.length) *
-                100
-              }%`,
+              width: `${pct}%`,
             }}
             className="h-full bg-[var(--accent)]"
           />

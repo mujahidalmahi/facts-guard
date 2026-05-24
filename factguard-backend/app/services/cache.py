@@ -1,26 +1,30 @@
 import asyncio
 import hashlib
 import json
-import os
-from pathlib import Path
+import threading
 
 import redis
-from dotenv import load_dotenv
 
-load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
+from app.config import settings
+from app.logging_config import get_logger
 
-CACHE_TTL = int(os.getenv("CACHE_TTL", "86400"))
-REDIS_URL = os.getenv("REDIS_URL")
+logger = get_logger("cache")
+
+CACHE_TTL = settings.CACHE_TTL
+REDIS_URL = settings.REDIS_URL
 
 _redis_client = None
+_redis_lock = threading.Lock()
 
 
 def _get_client():
     global _redis_client
     if _redis_client is None and REDIS_URL:
-        _redis_client = redis.Redis.from_url(
-            REDIS_URL, decode_responses=True
-        )
+        with _redis_lock:
+            if _redis_client is None:
+                _redis_client = redis.Redis.from_url(
+                    REDIS_URL, decode_responses=True
+                )
     return _redis_client
 
 
@@ -38,6 +42,32 @@ async def get_cached_analysis(claim_hash: str) -> dict | None:
             client.get, f"factguard:claim:{claim_hash}"
         )
         return json.loads(data) if data else None
+    except Exception as e:
+        logger.warning(f"Redis get_cached_analysis failed: {str(e)}")
+        return None
+
+
+async def set_progress(job_id: str, step: str) -> None:
+    try:
+        client = _get_client()
+        if client is None:
+            return
+        await asyncio.to_thread(
+            client.setex, f"factguard:progress:{job_id}", 300, step
+        )
+    except Exception:
+        pass
+
+
+async def get_progress(job_id: str) -> str | None:
+    try:
+        client = _get_client()
+        if client is None:
+            return None
+        data = await asyncio.to_thread(
+            client.get, f"factguard:progress:{job_id}"
+        )
+        return data if data else None
     except Exception:
         return None
 
@@ -55,7 +85,8 @@ async def get_cached_history() -> list[dict] | None:
             client.lrange, HISTORY_CACHE_KEY, 0, -1
         )
         return [json.loads(item) for item in data] if data else []
-    except Exception:
+    except Exception as e:
+        logger.warning(f"Redis get_cached_history failed: {str(e)}")
         return None
 
 
@@ -64,14 +95,12 @@ async def push_claim_to_history(claim_data: dict) -> None:
         client = _get_client()
         if client is None:
             return
-        await asyncio.to_thread(
-            client.lpush, HISTORY_CACHE_KEY, json.dumps(claim_data)
-        )
-        await asyncio.to_thread(
-            client.ltrim, HISTORY_CACHE_KEY, 0, HISTORY_CACHE_LIMIT - 1
-        )
-    except Exception:
-        pass
+        pipe = client.pipeline()
+        pipe.lpush(HISTORY_CACHE_KEY, json.dumps(claim_data))
+        pipe.ltrim(HISTORY_CACHE_KEY, 0, HISTORY_CACHE_LIMIT - 1)
+        await asyncio.to_thread(pipe.execute)
+    except Exception as e:
+        logger.warning(f"Redis push_claim_to_history failed: {str(e)}")
 
 
 async def set_cached_analysis(claim_hash: str, data: dict) -> None:
@@ -85,5 +114,5 @@ async def set_cached_analysis(claim_hash: str, data: dict) -> None:
             CACHE_TTL,
             json.dumps(data),
         )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Redis set_cached_analysis failed: {str(e)}")

@@ -37,8 +37,8 @@ export default function HomePage() {
   async function handleAnalyse() {
     if (!claim.trim())
       return;
-    if (claim.length > 1000) {
-      alert('Claim is too long (max 1000 characters)');
+    if (claim.length > 2000) {
+      alert('Claim is too long (max 2000 characters)');
       return;
     }
 
