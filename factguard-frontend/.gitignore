@@ -43,4 +43,3 @@ package-lock.json
 
 # extraneous empty directories inside frontend
 factguard-backend/
-history/
