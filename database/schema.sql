@@ -59,8 +59,14 @@ CREATE TABLE IF NOT EXISTS sources (
     CHECK (stance IN ('supports','contradicts','neutral')),
   relevance SMALLINT CHECK (relevance BETWEEN 0 AND 10),
   summary TEXT,
-  quote TEXT
+  quote TEXT,
+  credibility TEXT
+    CHECK (credibility IN ('High','Medium','Low'))
 );
+
+ALTER TABLE sources
+ADD COLUMN IF NOT EXISTS credibility TEXT
+  CHECK (credibility IN ('High','Medium','Low'));
 
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_claims_hash ON claims(claim_hash);

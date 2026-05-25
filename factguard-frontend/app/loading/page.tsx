@@ -18,13 +18,13 @@ const STEPS: Record<
 
   financial: [
     'Fetching market data...',
-    'Scraping news...',
+    'Scraping news via BrightData...',
     'Running AI analysis...',
     'Generating chart...',
   ],
 
   cart: [
-    'Scanning platforms...',
+    'Scanning platforms via BrightData...',
     'Comparing prices...',
     'Checking trust signals...',
     'Generating recommendation...',
@@ -45,11 +45,6 @@ const DESC_MAP: Record<
     'Comparing prices across multiple platforms...',
 };
 
-/**
- * Unified result routing
- * Everything now goes through:
- * /result/{jobId}?mode=...
- */
 const ROUTE_MAP: Record<
   string,
   string
@@ -57,6 +52,15 @@ const ROUTE_MAP: Record<
   verify: 'result',
   financial: 'result',
   cart: 'result',
+};
+
+const STEP_ICONS: Record<
+  string,
+  string
+> = {
+  verify: '\uD83D\uDD0D',
+  financial: '\uD83D\uDCC8',
+  cart: '\uD83D\uDED2',
 };
 
 function LoadingContent() {
@@ -105,8 +109,8 @@ function LoadingContent() {
       : 15;
 
   return (
-    <main className='min-h-[calc(100vh-3.5rem)] flex items-center justify-center bg-[var(--background)] px-6'>
-      <div className='text-center max-w-md w-full'>
+    <main className='min-h-[calc(100vh-3.5rem)] flex flex-col items-center justify-center bg-[var(--background)] px-6'>
+      <div className='text-center max-w-md w-full flex-1 flex flex-col items-center justify-center'>
         <motion.div
           animate={{
             rotate: 360,
@@ -143,7 +147,7 @@ function LoadingContent() {
             DESC_MAP.verify}
         </p>
 
-        <div className='mt-8 h-2 bg-[var(--muted)] rounded-full overflow-hidden'>
+        <div className='mt-8 h-2 bg-[var(--muted)] rounded-full overflow-hidden w-full'>
           <motion.div
             initial={{
               width: '0%',
@@ -154,7 +158,63 @@ function LoadingContent() {
             className='h-full bg-[var(--accent)]'
           />
         </div>
+
+        <div className='mt-8 space-y-3 w-full'>
+          {steps.map(
+            (
+              step,
+              i
+            ) => (
+              <div
+                key={step}
+                className='flex items-center gap-3 text-left'
+              >
+                <motion.div
+                  initial={{
+                    scale: 0,
+                  }}
+                  animate={{
+                    scale:
+                      i <=
+                      stepIndex
+                        ? 1
+                        : 0.4,
+                  }}
+                  className={`w-2 h-2 rounded-full shrink-0 ${
+                    i <
+                    stepIndex
+                      ? 'bg-emerald-500'
+                      : i ===
+                        stepIndex
+                      ? 'bg-indigo-400 pulse-ring'
+                      : 'bg-slate-600'
+                  }`}
+                />
+                <span
+                  className={`text-sm font-mono ${
+                    i <=
+                    stepIndex
+                      ? 'text-[var(--foreground)]'
+                      : 'text-[var(--muted-foreground)]'
+                  }`}
+                >
+                  {step}
+                </span>
+              </div>
+            )
+          )}
+        </div>
       </div>
+
+      <footer className='w-full text-center py-4 border-t border-[var(--card-border)] mt-auto'>
+        <p className='text-xs text-[var(--muted-foreground)]'>
+          Powered by{' '}
+          <span className='text-indigo-400 font-semibold'>
+            BrightData
+          </span>{' '}
+          \u00B7 Real-time web intelligence
+        </p>
+      </footer>
     </main>
   );
 }

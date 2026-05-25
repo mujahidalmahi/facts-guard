@@ -1,3 +1,9 @@
+import json
+from datetime import (
+    datetime,
+    timezone,
+)
+
 from openai import (
     OpenAI,
 )
@@ -14,95 +20,219 @@ logger = get_logger(
     "deepseek"
 )
 
-_client = None
+api_keys: list[str] = []
 
-def _get_client():
-    global _client
-    if _client is None:
-        key = settings.DEEPSEEK_API_KEY
-        if not key:
-            raise ValueError("DEEPSEEK_API_KEY not configured")
-        _client = OpenAI(
-            api_key=key,
-            base_url="https://openrouter.ai/api/v1",
+
+def _get_api_keys() -> list[str]:
+    global api_keys
+
+    if not api_keys:
+        api_keys = list(
+            settings.deepseek_api_keys_list
         )
-    return _client
+
+        if not api_keys:
+            raise ValueError(
+                "DEEPSEEK_API_KEYS not configured"
+            )
+
+    return api_keys
+
+
+def _get_client(
+    api_key: str,
+) -> OpenAI:
+    return OpenAI(
+        api_key=api_key,
+        base_url="https://openrouter.ai/api/v1",
+    )
+
+
+FINANCIAL_SYSTEM_PROMPT = """You are ORACLE, FactGuard's quant-grade market
+intelligence engine. You synthesize real-time web data, price signals, and
+macroeconomic context into institutional-quality market briefs.
+
+You serve: retail investors needing clarity, journalists covering markets,
+and analysts who need a rapid second opinion.
+
+## DATA INPUTS YOU RECEIVE
+1. Live web search results (BrightData SERP) — news, analyst reports, filings
+2. yFinance OHLCV data (when available) — exact price, volume, 30-day history
+3. The user's specific query
+
+## ANALYSIS FRAMEWORK
+Inside <scratchpad>:
+ A. PRICE CONTEXT: Current price vs 7d, 30d, 52w. Volume trend. Volatility.
+ B. CATALYST SCAN: Identify all bullish and bearish catalysts from evidence.
+ C. SENTIMENT READ: Is news sentiment broadly positive, negative, or mixed?
+ D. RISK MATRIX: List the top 3 specific risks (not generic "market risk").
+ E. SCENARIO PLANNING: Build three 30-day scenarios with probability weights.
+
+## SIGNAL CLASSIFICATION
+Bullish — Price + momentum + catalyst alignment. Risk-reward favors longs.
+Bearish — Deteriorating fundamentals, negative catalysts, weak technicals.
+Neutral — Mixed signals, consolidation, or insufficient data.
+
+## OUTPUT CONTRACT — VALID JSON ONLY
+{
+  "signal": "Bullish|Bearish|Neutral",
+  "signal_strength": <int 0-100>,
+  "asset": "Asset name and ticker",
+  "current_price": "price string with currency",
+  "price_trend": "Up|Down|Sideways",
+  "trend_magnitude": "Strong|Moderate|Weak",
+  "risk_level": "High|Medium|Low",
+  "risk_catalysts": ["specific risk 1", "specific risk 2", "specific risk 3"],
+  "key_factors": ["factor1", "factor2", "factor3"],
+  "summary": "3-4 sentence institutional-quality brief. Cite specific numbers.",
+  "prediction_30d": {
+    "bull_case": "Target + probability + catalyst required",
+    "base_case": "Target + probability + assumption",
+    "bear_case": "Target + probability + trigger"
+  },
+  "sources": [{"title": "...", "url": "...", "date": "YYYY-MM-DD"}],
+  "data_freshness": "real-time|intraday|daily|stale"
+}"""
+
+FINANCIAL_USER_PROMPT = """Today's date: {today}
+Query: {query}
+
+## WEB SEARCH RESULTS
+Use these results as your PRIMARY evidence. Weight by source tier (see system prompt).
+If fewer than 3 Tier-1/2 results are available, set confidence to Low and data_quality to the highest tier available.
+
+{search_context_block}
+
+Reason through the evidence, then return the JSON object."""
+
+
+FALLBACK_RESPONSE = {
+    "signal": "Neutral",
+    "signal_strength": 0,
+    "asset": "Unknown",
+    "current_price": "N/A",
+    "price_trend": "Sideways",
+    "trend_magnitude": "Weak",
+    "risk_level": "Medium",
+    "risk_catalysts": [],
+    "key_factors": [],
+    "summary": "Analysis unavailable.",
+    "prediction_30d": {
+        "bull_case": "N/A",
+        "base_case": "N/A",
+        "bear_case": "N/A",
+    },
+    "sources": [],
+    "data_freshness": "stale",
+}
+
+
+def build_search_context(results: list[dict]) -> str:
+    if not results:
+        return "(No search results available)"
+    lines = []
+    for i, r in enumerate(results, 1):
+        snippet = r.get("snippet", "")
+        if len(snippet) > 200:
+            snippet = snippet[:200] + "..."
+        lines += [
+            f"[{i}] Title: {r['title']}",
+            f"    URL: {r['url']}",
+            f"    Snippet: {snippet}",
+            "",
+        ]
+    return "\n".join(lines)
 
 
 async def deepseek_financial_analysis(
     query: str,
     context: str,
 ) -> dict:
-    try:
-        prompt = f"""
-You are a financial AI analyst. Use the live web search results below to answer the user's query.
+    today = datetime.now(
+        timezone.utc
+    ).strftime("%Y-%m-%d")
 
-User Query: {query}
+    search_context_block = (
+        build_search_context(
+            json.loads(context)
+            if isinstance(context, str)
+            and context.startswith("[")
+            else []
+        )
+        if False
+        else context
+    )
 
-Web Search Results:
-{context or "No web search results available. Use your best judgment."}
+    user_prompt = FINANCIAL_USER_PROMPT.format(
+        today=today,
+        query=query,
+        search_context_block=context or "(No search results available)",
+    )
 
-Return ONLY valid JSON with these fields:
-- "signal": "BUY" | "SELL" | "HOLD"
-- "signal_strength": "Weak" | "Moderate" | "Strong"
-- "price_trend": "Bullish" | "Bearish" | "Sideways"
-- "summary": 2-3 sentence explanation with specific data from search results
-- "risk_level": "Low" | "Medium" | "High"
-- "prediction_30d": brief outlook
-- "confidence": "Low" | "Medium" | "High"
-- "key_factors": list of 2-4 key factors
+    keys = _get_api_keys()
 
-Do NOT wrap in markdown. Return raw JSON only.
-"""
-
-        response = (
-            _get_client().chat.completions.create(
-                model=
-                    "deepseek/deepseek-v4-flash:free",
-                messages=[
-                    {
-                        "role":
-                            "user",
-                        "content":
-                            prompt,
-                    }
-                ],
-                temperature=0.3,
+    for attempt, key in enumerate(
+        keys
+    ):
+        try:
+            logger.info(
+                f"DeepSeek attempt {attempt + 1}/{len(keys)}"
             )
-        )
 
-        text = (
-            response
-            .choices[0]
-            .message.content
-        )
+            client = _get_client(key)
 
-        import json
+            response = (
+                client.chat.completions.create(
+                    model=
+                        settings.FINANCIAL_MODEL,
+                    messages=[
+                        {
+                            "role":
+                                "system",
+                            "content":
+                                FINANCIAL_SYSTEM_PROMPT,
+                        },
+                        {
+                            "role":
+                                "user",
+                            "content":
+                                user_prompt,
+                        }
+                    ],
+                    temperature=0.2,
+                )
+            )
 
-        return json.loads(
-            text
-        )
+            text = (
+                response
+                .choices[0]
+                .message.content
+            )
 
-    except Exception as e:
-        logger.error(
-            f"DeepSeek failed: {e}"
-        )
+            result = json.loads(
+                text
+            )
 
-        return {
-            "signal":
-                "HOLD",
-            "signal_strength":
-                "Moderate",
-            "price_trend":
-                "Sideways",
-            "summary":
-                "Analysis unavailable.",
-            "risk_level":
-                "Medium",
-            "prediction_30d":
-                "Uncertain",
-            "confidence":
-                "Low",
-            "key_factors":
-                [],
-        }
+            result["analysis_date"] = (
+                result.get(
+                    "analysis_date",
+                    today,
+                )
+            )
+
+            return result
+
+        except Exception as e:
+            logger.error(
+                f"DeepSeek attempt {attempt + 1} failed: {e}"
+            )
+
+            continue
+
+    logger.error(
+        "All DeepSeek API keys exhausted"
+    )
+
+    fallback = dict(FALLBACK_RESPONSE)
+    fallback["analysis_date"] = today
+    return fallback

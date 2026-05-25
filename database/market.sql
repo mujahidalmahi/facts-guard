@@ -44,6 +44,10 @@ CREATE TABLE IF NOT EXISTS product_listings (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Migration: add AI enrichment column (safe to re-run)
+ALTER TABLE product_queries
+ADD COLUMN IF NOT EXISTS ai_enrichment JSONB;
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_product_queries_hash ON product_queries(search_hash);
 CREATE INDEX IF NOT EXISTS idx_product_queries_status ON product_queries(status);

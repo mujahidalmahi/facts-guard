@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
 import { ModeSwitcher } from '@/components/ModeSwitcher';
 import SplashScreen from '@/components/SplashScreen';
 import type { AppMode } from '@/types';
@@ -131,13 +132,44 @@ export default function HomePage() {
       px-6 bg-[var(--background)]'
     >
       <div className='max-w-3xl w-full text-center space-y-6'>
-        <h1 className='text-6xl font-bold text-[var(--foreground)]'>
-          {cfg.headline}
-        </h1>
+        <div className='relative text-center space-y-4'>
+          <motion.div
+            key={mode}
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className='inline-flex items-center gap-2 px-4 py-1.5 rounded-full
+              border border-indigo-500/30 bg-indigo-500/10 text-indigo-300 text-xs
+              font-semibold tracking-widest uppercase'
+          >
+            <span className='w-1.5 h-1.5 rounded-full bg-indigo-400 pulse-ring' />
+            {mode === 'verify'
+              ? 'AI Fact Intelligence'
+              : mode === 'financial'
+              ? 'Live Market Oracle'
+              : 'Price Trust Engine'}
+          </motion.div>
 
-        <p className='text-[var(--muted-foreground)] text-lg'>
-          {cfg.sub}
-        </p>
+          <motion.h1
+            key={`title-${mode}`}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05 }}
+            className='text-5xl sm:text-7xl font-black tracking-tight'
+          >
+            <span className='gradient-text'>
+              {cfg.headline}
+            </span>
+          </motion.h1>
+
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.1 }}
+            className='text-slate-400 text-base sm:text-lg max-w-xl mx-auto'
+          >
+            {cfg.sub}
+          </motion.p>
+        </div>
 
         <div className='flex justify-center'>
           <ModeSwitcher
@@ -149,34 +181,34 @@ export default function HomePage() {
           />
         </div>
 
-        <textarea
-          value={input}
-          onChange={(e) =>
-            setInput(e.target.value)
-          }
-          placeholder={cfg.placeholder}
-          className='w-full mt-4 h-40 rounded-2xl
-          border border-[var(--card-border)]
-          p-5 text-lg outline-none
-          focus:ring-2 focus:ring-[var(--accent)]
-          resize-none bg-[var(--card)]
-          text-[var(--foreground)]
-          placeholder-[var(--muted-foreground)]'
-        />
-
-        <button
-          onClick={handleSubmit}
-          disabled={loading}
-          className='w-full bg-[var(--accent)]
-          hover:bg-[var(--accent-hover)]
-          transition-colors text-white py-4
-          rounded-2xl text-lg font-semibold
-          disabled:opacity-60'
-        >
-          {loading
-            ? 'Processing...'
-            : cfg.cta}
-        </button>
+        <div className='glass-card p-2 mt-2'>
+          <textarea
+            value={input}
+            onChange={(e) =>
+              setInput(e.target.value)
+            }
+            placeholder={cfg.placeholder}
+            className='w-full h-36 bg-transparent p-4 text-base
+              text-slate-100 placeholder-slate-500
+              outline-none resize-none'
+          />
+          <div className='flex items-center justify-between px-3 pb-2'>
+            <span className='text-xs text-slate-600'>
+              {input.length} chars
+            </span>
+            <button
+              onClick={handleSubmit}
+              disabled={loading}
+              className='btn-glow px-6 py-2.5 rounded-xl
+                text-white font-semibold text-sm
+                disabled:opacity-60'
+            >
+              {loading
+                ? '■ Analysing...'
+                : cfg.cta}
+            </button>
+          </div>
+        </div>
 
         <div className='flex flex-wrap justify-center gap-3'>
           {cfg.examples.map((ex) => (

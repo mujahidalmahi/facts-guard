@@ -18,10 +18,11 @@ export function CartResultView({
   data: CartResult;
 }) {
   const a = data.analysis;
+  const an = a.analysis;
 
   return (
     <main className='max-w-3xl mx-auto px-4 py-10 space-y-8'>
-      {/* Verdict headline */}
+      {/* Product headline */}
       <motion.div
         initial={{
           opacity: 0,
@@ -39,22 +40,18 @@ export function CartResultView({
         className='space-y-2'
       >
         <h1 className='text-4xl font-black text-[var(--foreground)]'>
-          {data.product}
+          {a.product_name || data.product}
         </h1>
 
-        <p className='text-xl font-bold text-[var(--accent)]'>
-          {a.verdict}
-        </p>
-
         <p className='text-sm text-[var(--muted-foreground)]'>
-          Price range:{' '}
+          Fair market range:{' '}
           <span className='text-[var(--foreground)] font-semibold'>
-            {a.price_range?.low} –{' '}
-            {a.price_range?.high}
+            {a.fair_market_range?.min} –{' '}
+            {a.fair_market_range?.max}
           </span>
 
-          {a.market_average &&
-            ` · Market avg: ${a.market_average}`}
+          {a.msrp &&
+            ` · MSRP: ${a.msrp}`}
         </p>
       </motion.div>
 
@@ -77,7 +74,7 @@ export function CartResultView({
           </div>
 
           <p className='font-bold text-[var(--foreground)]'>
-            {a.best_deal.platform}
+            {a.best_deal.merchant}
           </p>
 
           <p className='text-2xl font-black text-amber-600 dark:text-amber-400'>
@@ -85,21 +82,21 @@ export function CartResultView({
           </p>
 
           <p className='text-sm text-[var(--muted-foreground)] mt-1'>
-            {a.best_deal.why}
+            {a.best_deal.reason}
           </p>
         </div>
       )}
 
       {/* Recommendation */}
       <p className='text-[var(--foreground)] leading-relaxed'>
-        {a.recommendation}
+        {an?.recommendation}
       </p>
 
       {/* Warnings */}
-      {a.warnings?.length >
+      {an?.warnings?.length >
         0 && (
         <div className='space-y-2'>
-          {a.warnings.map(
+          {an.warnings.map(
             (w, i) => (
               <div
                 key={i}
@@ -118,6 +115,26 @@ export function CartResultView({
               </div>
             )
           )}
+        </div>
+      )}
+
+      {/* Price Trend & Best Time */}
+      {an && (
+        <div className="flex gap-4 text-sm">
+          <span className="text-[var(--muted-foreground)]">
+            Trend: <span className={`font-semibold ${
+              an.price_trend === 'Rising' ? 'text-green-400' :
+              an.price_trend === 'Dropping' ? 'text-red-400' :
+              'text-amber-400'
+            }`}>{an.price_trend}</span>
+          </span>
+          <span className="text-[var(--muted-foreground)]">
+            Best time: <span className={`font-semibold ${
+              an.best_time_to_buy === 'Now' ? 'text-green-400' :
+              an.best_time_to_buy === 'Urgent' ? 'text-amber-400' :
+              'text-slate-400'
+            }`}>{an.best_time_to_buy}</span>
+          </span>
         </div>
       )}
 

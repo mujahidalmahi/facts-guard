@@ -8,13 +8,13 @@ export function Nav() {
   const { theme, toggleTheme } = useTheme();
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-[var(--card-border)] bg-[var(--card)]/80 backdrop-blur-md">
+    <nav className="sticky top-0 z-50 border-b border-[var(--glass-border)] bg-[var(--glass)] backdrop-blur-2xl saturate-[160%]">
       <div className="max-w-5xl mx-auto flex items-center justify-between h-14 px-4">
         <Link
           href="/"
           className="flex items-center gap-2 font-bold text-lg text-[var(--foreground)] hover:text-[var(--accent)] transition-colors"
         >
-          <Shield className="size-5 text-[var(--accent)]" />
+          <Shield className="size-5 text-[var(--accent)] drop-shadow-[0_0_6px_var(--accent-glow)]" />
           FactGuard
         </Link>
 

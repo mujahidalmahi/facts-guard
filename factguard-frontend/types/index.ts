@@ -10,12 +10,28 @@ export type Confidence =
   | 'Medium'
   | 'Low';
 
+export type BiasSignal =
+  | 'cherry_picking'
+  | 'false_equivalence'
+  | 'appeal_to_authority'
+  | 'omission'
+  | 'misleading_statistics'
+  | 'emotional_language'
+  | 'unverified_anecdote';
+
+export type SourceDiversity =
+  | 'High'
+  | 'Medium'
+  | 'Low';
+
 export interface Source {
   url: string;
   title: string;
   author?: string;
   date?: string;
   stance: 'supports' | 'contradicts' | 'neutral';
+  credibility: 'High' | 'Medium' | 'Low';
+  tier: 1 | 2 | 3 | 4;
   relevance: number;
   summary: string;
   quote?: string;
@@ -27,9 +43,12 @@ export interface VerifyResult {
   verdict: Verdict;
   confidence: Confidence;
   summary: string;
+  narrative_frame?: string;
   supports: number;
   contradicts: number;
   neutral: number;
+  bias_signals: BiasSignal[];
+  source_diversity: SourceDiversity;
   sources: Source[];
   createdAt: string;
 }
@@ -87,51 +106,48 @@ export interface GraphData {
   data: GraphDataPoint[];
 }
 
+export interface Prediction30d {
+  bull_case: string;
+  base_case: string;
+  bear_case: string;
+}
+
 export interface FinancialAnalysis {
   signal:
-    | 'BUY'
-    | 'SELL'
-    | 'HOLD'
-    | 'WATCH';
+    | 'Bullish'
+    | 'Bearish'
+    | 'Neutral';
 
-  signal_strength:
+  signal_strength: number;
+
+  asset: string;
+  current_price: string;
+
+  price_trend:
+    | 'Up'
+    | 'Down'
+    | 'Sideways';
+
+  trend_magnitude:
     | 'Strong'
     | 'Moderate'
     | 'Weak';
-
-  price_trend:
-    | 'Bullish'
-    | 'Bearish'
-    | 'Sideways';
-
-  summary: string;
-  key_factors: string[];
 
   risk_level:
     | 'Low'
     | 'Medium'
     | 'High';
 
-  prediction_30d: string;
-  confidence: string;
+  risk_catalysts: string[];
+  key_factors: string[];
+  summary: string;
+  prediction_30d: Prediction30d;
+  data_freshness: 'real-time' | 'intraday' | 'daily' | 'stale';
 }
 
 export interface FinancialSource {
   title: string;
   url: string;
-  domain?: string;
-
-  credibility:
-    | 'High'
-    | 'Medium'
-    | 'Low';
-
-  stance:
-    | 'Bullish'
-    | 'Bearish'
-    | 'Neutral';
-
-  summary: string;
   date?: string;
 }
 
@@ -139,7 +155,6 @@ export interface FinancialResult {
   jobId: string;
   mode: 'financial';
   query: string;
-
   graph_data: GraphData;
   analysis: FinancialAnalysis;
   sources: FinancialSource[];
@@ -148,42 +163,43 @@ export interface FinancialResult {
 // =========================
 // Cart Types
 // =========================
-export interface CartListing {
-  platform: string;
+export interface CartListingEntry {
   title: string;
+  merchant: string;
+  price: number;
+  currency: string;
   url: string;
-  snippet: string;
-
-  trust_signal:
-    | 'green'
-    | 'yellow'
-    | 'red';
+  trust_level: 'GREEN' | 'YELLOW' | 'RED';
+  deal_score: number;
+  trust_reason: string;
+  counterfeit_risk: 'High' | 'Medium' | 'Low' | 'None';
+  condition: 'New' | 'Refurbished' | 'Used' | 'Unknown';
+  in_stock: boolean;
 }
 
 export interface CartAnalysis {
+  product_name: string;
+  msrp: string | null;
+  fair_market_range: { min: string; max: string; currency: string };
   best_deal: {
-    platform: string;
+    merchant: string;
     price: string;
-    why: string;
+    url: string;
+    reason: string;
   };
-
-  verdict: string;
-
-  price_range: {
-    low: string;
-    high: string;
+  listings: CartListingEntry[];
+  analysis: {
+    warnings: string[];
+    recommendation: string;
+    price_trend: 'Rising' | 'Stable' | 'Dropping';
+    best_time_to_buy: 'Now' | 'Wait' | 'Urgent';
   };
-
-  recommendation: string;
-  warnings: string[];
-  market_average: string;
 }
 
 export interface CartResult {
   jobId: string;
   mode: 'cart';
   product: string;
-
-  listings: CartListing[];
+  listings: CartListingEntry[];
   analysis: CartAnalysis;
 }

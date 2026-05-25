@@ -37,6 +37,9 @@ import {
   ResultSkeleton,
 } from '@/components/Skeleton';
 
+import BiasHeatmap from '@/components/BiasHeatmap';
+import SourceGraph from '@/components/SourceGraph';
+
 import {
   Source,
   Verdict,
@@ -84,9 +87,12 @@ type ResultData = {
   verdict?: Verdict;
   confidence?: Confidence;
   summary?: string;
+  narrative_frame?: string;
   supports?: number;
   contradicts?: number;
   neutral?: number;
+  bias_signals?: string[];
+  source_diversity?: string;
   sources?: Source[];
 };
 
@@ -163,6 +169,11 @@ export default function ResultPage({
   const [
     error,
     setError,
+  ] = useState(false);
+
+  const [
+    showGraph,
+    setShowGraph,
   ] = useState(false);
 
   useEffect(() => {
@@ -326,7 +337,7 @@ export default function ResultPage({
         </p>
       </motion.div>
 
-      <div className='flex flex-wrap gap-3'>
+      <div className='flex flex-wrap items-center gap-3'>
         <VerdictBadge
           verdict={
             data.verdict ??
@@ -340,9 +351,25 @@ export default function ResultPage({
             'Low'
           }
         />
+
+        {data.source_diversity && (
+          <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold font-mono tracking-wide
+            ${data.source_diversity === 'High' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+              data.source_diversity === 'Medium' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+              'bg-red-500/10 text-red-400 border border-red-500/20'}`}
+          >
+            {data.source_diversity} Diversity
+          </span>
+        )}
       </div>
 
-      <p>
+      {data.narrative_frame && (
+        <p className="text-sm italic text-slate-400 border-l-2 border-indigo-500/40 pl-4 py-2 bg-indigo-500/5 rounded-r-lg">
+          Framing: &ldquo;{data.narrative_frame}&rdquo;
+        </p>
+      )}
+
+      <p className="text-[var(--foreground)] leading-relaxed">
         {
           data.summary
         }
@@ -363,12 +390,30 @@ export default function ResultPage({
         }
       />
 
-      <EvidenceTimeline
-        sources={
-          data.sources ??
-          []
-        }
-      />
+      {data.bias_signals && data.bias_signals.length > 0 && (
+        <BiasHeatmap signals={data.bias_signals} />
+      )}
+
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-[var(--muted-foreground)] uppercase tracking-wide">
+            Sources
+          </h3>
+          <button
+            onClick={() => setShowGraph(v => !v)}
+            className="text-xs text-[var(--accent)] hover:text-[var(--accent-hover)] font-mono transition-colors"
+          >
+            {showGraph ? 'List View' : 'Graph View'}
+          </button>
+        </div>
+        {showGraph ? (
+          <SourceGraph sources={data.sources ?? []} />
+        ) : (
+          <EvidenceTimeline
+            sources={data.sources ?? []}
+          />
+        )}
+      </div>
 
       <div className='flex gap-3'>
         <ShareCard

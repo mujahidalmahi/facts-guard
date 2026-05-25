@@ -51,8 +51,11 @@ class Settings(
         "gemini-2.5-flash"
     )
 
-    # NEW API KEYS
     DEEPSEEK_API_KEY: str = (
+        ""
+    )
+
+    DEEPSEEK_API_KEYS: str = (
         ""
     )
 
@@ -96,6 +99,22 @@ class Settings(
         Optional[str]
     ) = None
 
+    ROUTER_MODEL: str = (
+        "gemini-2.5-flash"
+    )
+
+    VERIFY_MODEL: str = (
+        "gemini-2.5-flash"
+    )
+
+    FINANCIAL_MODEL: str = (
+        "deepseek/deepseek-v4-flash:free"
+    )
+
+    SNIPPET_MAX_CHARS: int = (
+        200
+    )
+
     class Config:
         env_file = str(
             Path(
@@ -127,6 +146,30 @@ class Settings(
             )
             if key.strip()
         ]
+
+    @property
+    def deepseek_api_keys_list(
+        self,
+    ) -> list[str]:
+        if (
+            self.DEEPSEEK_API_KEYS
+        ):
+            return [
+                key.strip()
+                for key in self.DEEPSEEK_API_KEYS.split(
+                    ","
+                )
+                if key.strip()
+            ]
+
+        if (
+            self.DEEPSEEK_API_KEY
+        ):
+            return [
+                self.DEEPSEEK_API_KEY
+            ]
+
+        return []
 
     # NEW dynamic today property
     @property

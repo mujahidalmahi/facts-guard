@@ -25,6 +25,9 @@ from app.services.cache import (
     set_cached_analysis,
     set_progress,
 )
+from app.services.cart_ai import (
+    enrich_cart_listings,
+)
 from app.utils.pricing_parser import (
     classify_merchant,
     cluster_listings,
@@ -96,6 +99,102 @@ def _listing_to_insert(
         "model_name":
             l.get(
                 "model_name"
+            ),
+    }
+
+
+def _build_ai_analysis(
+    ai_enrichment: dict | None,
+    listings_data: list[dict],
+) -> dict:
+    if not ai_enrichment:
+        return {
+            "best_deal": {
+                "platform":
+                    listings_data[0].get(
+                        "merchant", "Unknown"
+                    )
+                if listings_data
+                else "Unknown",
+                "price":
+                    str(listings_data[0].get("price", "N/A"))
+                if listings_data
+                else "N/A",
+                "why": "Lowest trusted result",
+            },
+            "verdict":
+                f"Found {len(listings_data)} listings",
+            "price_range": {
+                "low": str(min(
+                    [x.get("price") for x in listings_data if x.get("price") is not None],
+                    default=0,
+                )),
+                "high": str(max(
+                    [x.get("price") for x in listings_data if x.get("price") is not None],
+                    default=0,
+                )),
+            },
+            "recommendation":
+                "Compare seller reputation before purchasing.",
+            "warnings": [],
+            "market_average": "Dynamic",
+        }
+
+    best_deal = ai_enrichment.get("best_deal")
+    return {
+        "best_deal": {
+            "platform":
+                best_deal.get("platform", "Unknown")
+            if best_deal
+            else "Unknown",
+            "price":
+                str(best_deal.get("price", "N/A"))
+            if best_deal
+            else "N/A",
+            "why":
+                best_deal.get("why", "")
+            if best_deal
+            else "",
+        },
+        "verdict":
+            ai_enrichment.get(
+                "verdict",
+                f"Found {len(listings_data)} listings",
+            ),
+        "price_range": {
+            "low":
+                str(
+                    ai_enrichment
+                    .get("price_range", {})
+                    .get("low", 0)
+                ),
+            "high":
+                str(
+                    ai_enrichment
+                    .get("price_range", {})
+                    .get("high", 0)
+                ),
+        },
+        "recommendation":
+            ai_enrichment.get(
+                "recommendation",
+                "Compare seller reputation before purchasing.",
+            ),
+        "warnings":
+            ai_enrichment.get(
+                "warnings",
+                [],
+            ),
+        "market_average":
+            str(
+                ai_enrichment.get(
+                    "market_average",
+                    "Dynamic",
+                )
+            ),
+        "variant_notes":
+            ai_enrichment.get(
+                "variant_notes",
             ),
     }
 
@@ -393,6 +492,19 @@ async def get_full_price_result(
 
         listings_data = []
 
+    ai_enrichment = (
+        query.get(
+            "ai_enrichment"
+        )
+    )
+
+    analysis = (
+        _build_ai_analysis(
+            ai_enrichment,
+            listings_data,
+        )
+    )
+
     result = {
         "mode":
             "cart",
@@ -424,86 +536,8 @@ async def get_full_price_result(
             for l in listings_data
         ],
 
-        "analysis": {
-            "best_deal": {
-                "platform":
-                    listings_data[
-                        0
-                    ].get(
-                        "merchant",
-                        "Unknown",
-                    )
-                if listings_data
-                else "Unknown",
-
-                "price":
-                    str(
-                        listings_data[
-                            0
-                        ].get(
-                            "price",
-                            "N/A",
-                        )
-                    )
-                if listings_data
-                else "N/A",
-
-                "why":
-                    "Lowest trusted result",
-            },
-
-            "verdict":
-                f"Found "
-                f"{len(listings_data)} "
-                f"listings",
-
-            "price_range": {
-                "low":
-                    str(
-                        min(
-                            [
-                                x.get(
-                                    "price"
-                                )
-                                for x in listings_data
-                                if x.get(
-                                    "price"
-                                )
-                                is not None
-                            ],
-                            default=0,
-                        )
-                    ),
-
-                "high":
-                    str(
-                        max(
-                            [
-                                x.get(
-                                    "price"
-                                )
-                                for x in listings_data
-                                if x.get(
-                                    "price"
-                                )
-                                is not None
-                            ],
-                            default=0,
-                        )
-                    ),
-            },
-
-            "recommendation":
-                "Compare seller "
-                "reputation "
-                "before purchasing.",
-
-            "warnings":
-                [],
-
-            "market_average":
-                "Dynamic",
-        },
+        "analysis":
+            analysis,
     }
 
     await save_cart_result(
@@ -700,6 +734,14 @@ async def process_price_check(
                 },
             )
 
+        ai_enrichment = (
+            await enrich_cart_listings(
+                product_name,
+                listings,
+                job_id,
+            )
+        )
+
         await set_progress(
             job_id,
             PRICING_PROGRESS_SAVING,
@@ -718,6 +760,9 @@ async def process_price_check(
 
                 "variants_data":
                     variants,
+
+                "ai_enrichment":
+                    ai_enrichment,
             },
             "id",
             query_id,

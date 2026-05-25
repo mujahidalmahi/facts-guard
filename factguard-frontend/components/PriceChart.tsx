@@ -1,6 +1,11 @@
 'use client';
 
 import {
+  useEffect,
+  useState,
+} from 'react';
+
+import {
   LineChart,
   Line,
   XAxis,
@@ -46,6 +51,12 @@ export function PriceChart({
 }: {
   data: GraphData;
 }) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const positive =
     data.change_24h?.startsWith('+');
 
@@ -114,80 +125,82 @@ export function PriceChart({
         </div>
       </div>
 
-      <div className='h-52'>
-        <ResponsiveContainer
-          width='100%'
-          height='100%'
-        >
-          <LineChart
-            data={data.data}
-            margin={{
-              top: 4,
-              right: 4,
-              bottom: 0,
-              left: 0,
-            }}
+      <div className='h-52 w-full'>
+        {mounted && (
+          <ResponsiveContainer
+            width='100%'
+            height='100%'
           >
-            <CartesianGrid
-              strokeDasharray='3 3'
-              stroke='var(--card-border)'
-            />
-
-            <XAxis
-              dataKey='date'
-              tick={{
-                fontSize: 11,
-                fill:
-                  'var(--muted-foreground)',
+            <LineChart
+              data={data.data}
+              margin={{
+                top: 4,
+                right: 4,
+                bottom: 0,
+                left: 0,
               }}
-              tickFormatter={(v) =>
-                v.slice(5)
-              }
-            />
+            >
+              <CartesianGrid
+                strokeDasharray='3 3'
+                stroke='var(--card-border)'
+              />
 
-            <YAxis
-              tick={{
-                fontSize: 11,
-                fill:
-                  'var(--muted-foreground)',
-              }}
-              domain={[
-                'auto',
-                'auto',
-              ]}
-              width={60}
-            />
+              <XAxis
+                dataKey='date'
+                tick={{
+                  fontSize: 11,
+                  fill:
+                    'var(--muted-foreground)',
+                }}
+                tickFormatter={(v) =>
+                  v.slice(5)
+                }
+              />
 
-            <Tooltip
-              contentStyle={{
-                background:
-                  'var(--card)',
-                border:
-                  '1px solid var(--card-border)',
-                borderRadius: 8,
-                fontSize: 12,
-              }}
-            />
+              <YAxis
+                tick={{
+                  fontSize: 11,
+                  fill:
+                    'var(--muted-foreground)',
+                }}
+                domain={[
+                  'auto',
+                  'auto',
+                ]}
+                width={60}
+              />
 
-            <ReferenceLine
-              y={avg}
-              stroke='var(--muted-foreground)'
-              strokeDasharray='4 4'
-            />
+              <Tooltip
+                contentStyle={{
+                  background:
+                    'var(--card)',
+                  border:
+                    '1px solid var(--card-border)',
+                  borderRadius: 8,
+                  fontSize: 12,
+                }}
+              />
 
-            <Line
-              type='monotone'
-              dataKey='price'
-              stroke={lineColor}
-              strokeWidth={2.5}
-              dot={false}
-              activeDot={{
-                r: 4,
-                fill: lineColor,
-              }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+              <ReferenceLine
+                y={avg}
+                stroke='var(--muted-foreground)'
+                strokeDasharray='4 4'
+              />
+
+              <Line
+                type='monotone'
+                dataKey='price'
+                stroke={lineColor}
+                strokeWidth={2.5}
+                dot={false}
+                activeDot={{
+                  r: 4,
+                  fill: lineColor,
+                }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
       </div>
     </div>
   );

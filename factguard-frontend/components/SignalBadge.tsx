@@ -1,34 +1,25 @@
 'use client';
 
-// Trading signal badge — BUY / SELL / HOLD / WATCH
-
-const CFG = {
-  BUY: {
+const CFG: Record<string, { bg: string; tx: string; bd: string; label: string }> = {
+  Bullish: {
     bg: '#dcfce7',
     tx: '#15803d',
     bd: '#86efac',
-    label: '↑ BUY',
+    label: '\u2191 BULLISH',
   },
 
-  SELL: {
+  Bearish: {
     bg: '#fee2e2',
     tx: '#b91c1c',
     bd: '#fca5a5',
-    label: '↓ SELL',
+    label: '\u2193 BEARISH',
   },
 
-  HOLD: {
+  Neutral: {
     bg: '#fef9c3',
     tx: '#854d0e',
     bd: '#fde047',
-    label: '◆ HOLD',
-  },
-
-  WATCH: {
-    bg: '#e0f2fe',
-    tx: '#0369a1',
-    bd: '#7dd3fc',
-    label: '■ WATCH',
+    label: '\u25C6 NEUTRAL',
   },
 };
 
@@ -40,7 +31,7 @@ export function SignalBadge({
   const c =
     CFG[
       signal as keyof typeof CFG
-    ] ?? CFG.WATCH;
+    ] ?? CFG.Neutral;
 
   return (
     <span

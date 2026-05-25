@@ -28,6 +28,15 @@ export default function RootLayout({
           <ErrorBoundary>
             {children}
           </ErrorBoundary>
+          <footer className='w-full text-center py-3 border-t border-[var(--card-border)] bg-[var(--glass)] backdrop-blur-md'>
+            <p className='text-xs text-[var(--muted-foreground)]'>
+              Powered by{' '}
+              <span className='text-indigo-400 font-semibold'>
+                BrightData
+              </span>{' '}
+              &middot; Real-time web intelligence
+            </p>
+          </footer>
         </ThemeProvider>
       </body>
     </html>
