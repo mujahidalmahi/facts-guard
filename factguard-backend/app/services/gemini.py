@@ -431,9 +431,20 @@ async def analyze_claim(
                 f"JSON parsing failed: {str(e)}"
             )
 
-            return dict(
-                FALLBACK_RESPONSE
+            remaining = (
+                max_retries
+                - attempt
+                - 1
             )
+
+            if remaining > 0:
+                gemini_service.rotate_key()
+
+                await asyncio.sleep(
+                    1
+                )
+
+            continue
 
         except Exception as e:
             logger.error(
