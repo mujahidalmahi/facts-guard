@@ -17,7 +17,7 @@ const PROGRESS_ICONS: Record<string, string> = {
   Failed: '❌',
 }
 
-export function useJobPolling(jobId: string, resultPath: string, progressSteps: string[]) {
+export function useJobPolling(jobId: string, resultPath: string, progressSteps: string[], mode: string = 'verify') {
   const router = useRouter()
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [progress, setProgress] = useState('Processing...')
@@ -25,7 +25,7 @@ export function useJobPolling(jobId: string, resultPath: string, progressSteps: 
   useEffect(() => {
     async function poll() {
       try {
-        const res = await fetch(`${API_URL}/${resultPath}/${jobId}`)
+        const res = await fetch(`${API_URL}/${resultPath}/${jobId}?mode=${mode}`)
         if (!res.ok) return
 
         const data = await res.json()
@@ -36,7 +36,7 @@ export function useJobPolling(jobId: string, resultPath: string, progressSteps: 
 
         if (data.status && data.status !== 'processing') {
           clearInterval(intervalRef.current!)
-          router.push(`/${resultPath}/${jobId}`)
+          router.push(`/${resultPath}/${jobId}?mode=${mode}`)
         }
       } catch {
         // retry on next interval
@@ -51,7 +51,7 @@ export function useJobPolling(jobId: string, resultPath: string, progressSteps: 
         clearInterval(intervalRef.current)
       }
     }
-  }, [router, jobId, resultPath])
+  }, [router, jobId, resultPath, mode])
 
   const icon = PROGRESS_ICONS[progress] || '⏳'
 

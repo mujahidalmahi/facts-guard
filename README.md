@@ -1,35 +1,65 @@
 # FactGuard
 
-AI-powered misinformation detection. Submit a claim — FactGuard gathers live web evidence via DuckDuckGo and analyzes it with Google Gemini 2.5 Flash to return a source-backed verdict.
+AI-powered misinformation detection, market intelligence, and price comparison. Submit a claim, financial query, or product — FactGuard gathers live evidence and returns a source-backed verdict.
 
 ## Architecture
 
 ```
 news-guard/
-├── factguard-backend/        # Python FastAPI server
-│   └── app/
-│       ├── api/verify.py     # POST /verify, GET /result/{id}
-│       ├── api/history.py    # GET /history
-│       ├── services/
-│       │   ├── gemini.py     # Gemini 2.5 Flash + web search grounding
-│       │   ├── cache.py      # Redis claim dedup + progress tracking
-│       │   └── supabase_db.py
-│       ├── config.py         # Pydantic Settings (env vars)
-│       ├── dependencies.py   # GeminiService, SupabaseService (DI)
-│       ├── schemas.py        # Pydantic request/response models
-│       ├── exceptions.py     # Custom exception hierarchy
-│       └── utils/
-│           ├── search.py     # DuckDuckGo web search (ddgs)
-│           └── validators.py # SQL injection pattern detection
-├── factguard-frontend/       # Next.js 16 + Tailwind v4 + TypeScript
+├── factguard-backend/           # Python FastAPI server
 │   ├── app/
-│   │   ├── page.tsx          # Splash screen + claim input
-│   │   ├── loading/page.tsx  # Polling with real-time progress
-│   │   └── result/[jobId]/   # Verdict, sources, download/share
-│   ├── components/           # UI components
-│   └── types/                # TypeScript type definitions
+│   │   ├── api/
+│   │   │   ├── verify.py        # POST /verify, GET /result/{id}
+│   │   │   ├── financial.py     # POST /financial, GET /financial-result/{id}
+│   │   │   ├── pricing.py       # POST /cart, GET /cart-result/{id}
+│   │   │   └── history.py       # GET /history
+│   │   ├── services/
+│   │   │   ├── gemini.py        # Gemini 2.5 Flash prompt + parsing
+│   │   │   ├── deepseek.py      # DeepSeek fallback provider
+│   │   │   ├── cache.py         # Redis claim dedup + progress tracking
+│   │   │   ├── supabase_db.py   # Supabase persistence layer
+│   │   │   ├── financial.py     # Financial analysis logic
+│   │   │   └── pricing.py       # Cart/pricing analysis logic
+│   │   ├── config.py            # Pydantic Settings (env vars)
+│   │   ├── schemas.py           # Pydantic request/response models
+│   │   ├── exceptions.py        # Custom exception hierarchy
+│   │   ├── middleware.py        # Error handlers
+│   │   └── utils/
+│   │       ├── search.py        # Web search (BrightData/DuckDuckGo)
+│   │       ├── parsing.py       # AI JSON response parser
+│   │       ├── pricing_parser.py
+│   │       ├── validators.py    # SQL injection pattern detection
+│   │       └── constants.py     # Shared constants
+│   ├── scripts/
+│   │   └── seed_demo.py         # Pre-seed Redis with demo fixtures
+│   └── requirements.txt
+├── factguard-frontend/          # Next.js 16 + Tailwind v4 + TypeScript
+│   ├── app/
+│   │   ├── page.tsx             # Splash screen + mode switcher + input
+│   │   ├── loading/page.tsx     # Polling with real-time progress
+│   │   ├── history/page.tsx     # Verification history
+│   │   └── result/[jobId]/
+│   │       ├── page.tsx         # Unified result view (verify/financial/cart)
+│   │       ├── layout.tsx       # OG image metadata
+│   │       ├── og-image/route.tsx  # Edge OG image generation
+│   │       ├── FinancialResultView.tsx
+│   │       └── CartResultView.tsx
+│   ├── components/              # UI components
+│   │   ├── ConfidencePill.tsx
+│   │   ├── VerdictBadge.tsx
+│   │   ├── SignalBadge.tsx
+│   │   ├── AgreementMeter.tsx
+│   │   ├── EvidenceTimeline.tsx
+│   │   ├── PriceChart.tsx
+│   │   ├── CartProductCard.tsx
+│   │   ├── ResultErrorBoundary.tsx
+│   │   ├── ModeSwitcher.tsx
+│   │   ├── ShareCard.tsx
+│   │   ├── Skeleton.tsx
+│   │   └── ...
+│   └── types/index.ts           # TypeScript type definitions
 └── database/
-    └── schema.sql            # Supabase Postgres schema
+    └── schema.sql               # Supabase Postgres schema
 ```
 
 ## Stack
@@ -37,8 +67,8 @@ news-guard/
 | Layer | Technology |
 |-------|-----------|
 | API | Python 3.12, FastAPI 0.115, Uvicorn |
-| AI | Google Gemini 2.5 Flash (`google-generativeai`) |
-| Search | DuckDuckGo (`ddgs`) — free, no API key |
+| AI | Google Gemini 2.5 Flash, DeepSeek (fallback) |
+| Search | BrightData (primary), DuckDuckGo (fallback) |
 | Database | Supabase (Postgres) |
 | Cache | Redis (Upstash) — claim dedup + progress tracking |
 | Frontend | Next.js 16, React 19, TypeScript, Tailwind v4 |
@@ -53,7 +83,7 @@ news-guard/
 - pnpm
 - A Supabase project (free tier)
 - Google Gemini API key(s) — [get one here](https://aistudio.google.com/apikey)
-- Redis URL (Upstash or local) — optional, app works without it
+- Redis URL (Upstash or local) — app works without it
 
 ### Backend
 
@@ -71,6 +101,13 @@ GEMINI_API_KEYS=key1,key2
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 REDIS_URL=rediss://default:password@host:port  # optional
+FRONTEND_URL=http://localhost:3000
+```
+
+Optional: pre-seed Redis with demo fixtures:
+
+```bash
+python scripts/seed_demo.py
 ```
 
 Run:
@@ -94,8 +131,6 @@ Create `.env.local` in `factguard-frontend/.env.local`:
 
 ```
 NEXT_PUBLIC_API_URL=http://localhost:8000
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 ```
 
 Run:
@@ -106,37 +141,27 @@ pnpm dev     # http://localhost:3000
 
 ## API
 
+### Endpoints
+
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/verify` | Submit a claim → returns `{ jobId }` |
-| `GET` | `/result/{job_id}` | Poll for result (returns progress or full verdict) |
-| `GET` | `/history` | Recent verifications from cache |
+| `POST` | `/financial` | Submit a financial query → returns `{ jobId }` |
+| `POST` | `/cart` | Submit a product for price comparison → returns `{ jobId }` |
+| `GET` | `/result/{job_id}?mode=verify\|financial\|cart` | Poll for result |
+| `GET` | `/financial-result/{job_id}` | Legacy financial result endpoint |
+| `GET` | `/history` | Recent claims from cache (includes mode + display_text) |
 | `GET` | `/health` | Health check with version + environment |
 
-### POST /verify
+### Response shape
 
-```json
-{ "claim": "The Earth is flat" }
-```
-
-Returns immediately:
-
-```json
-{ "jobId": "uuid-here" }
-```
-
-Poll `GET /result/{job_id}` — while processing:
-
-```json
-{ "status": "processing", "jobId": "...", "progress": "Searching DuckDuckGo..." }
-```
-
-When complete:
+All modes return via `GET /result/{job_id}?mode=...`:
 
 ```json
 {
   "status": "done",
-  "jobId": "...",
+  "jobId": "uuid",
+  "mode": "verify",
   "claim": "The Earth is flat",
   "verdict": "Likely Misleading",
   "confidence": "High",
@@ -147,28 +172,51 @@ When complete:
   "sources": [
     {
       "title": "Wikipedia: Earth",
-      "url": "https://en.wikipedia.org/wiki/Earth",
+      "url": "https://en.wikipedia.org/...",
       "stance": "contradicts",
+      "credibility": "High",
       "relevance": 10,
-      "summary": "Comprehensive article on Earth's shape",
-      "quote": "Earth is an oblate spheroid"
+      "summary": "...",
+      "quote": "..."
     }
   ]
+}
+```
+
+Financial mode also includes `graph_data` and `analysis` (signal, price_trend, risk_level, key_factors, prediction_30d). Cart mode includes `listings` and `analysis` (best_deal, price_range, warnings, recommendation).
+
+### Processing response
+
+While analysis is running:
+
+```json
+{
+  "status": "processing",
+  "jobId": "uuid"
 }
 ```
 
 ## Data Flow
 
 ```
-User submits claim
-  → POST /verify → backend creates Supabase record + spawns async task
-  → Frontend polls GET /result/{job_id} every 1.5s
-  → Backend checks Redis cache for claim hash:
-      HIT  → return cached result immediately (zero Gemini cost)
-      MISS → search DuckDuckGo → inject results into Gemini prompt
-             → validate response structure → save to Supabase → cache in Redis
-  → Frontend receives "done" status → redirects to result page
+User submits input
+  → POST /{mode} → backend creates Supabase record + spawns BackgroundTask
+  → Frontend polls GET /result/{job_id}?mode={mode} every 1.5s
+  → Backend checks Redis cache by job_id:
+      HIT  → return cached raw_json immediately
+      MISS → query Supabase results table raw_json column
+              → return full payload with status: 'done'
+  → If claim status is 'error' → return { status: 'error' }
+  → Otherwise → return { status: 'processing' }
 ```
+
+## Modes
+
+| Mode | Input | What it does |
+|------|-------|-------------|
+| **Verify** | A claim statement | Searches the web, gathers evidence, returns verdict + sources |
+| **Financial** | A market query (e.g. "Bitcoin price") | Fetches price data, returns analysis + chart + sources |
+| **Cart** | A product name | Compares prices across retailers, returns best deal + warnings |
 
 ## Verdicts
 
@@ -193,6 +241,8 @@ User submits claim
 | `FRONTEND_URL` | No | `http://localhost:3000` | CORS origin |
 | `GEMINI_MODEL_NAME` | No | `gemini-2.5-flash` | Gemini model |
 | `CACHE_TTL` | No | `86400` | Claim cache TTL (seconds) |
+| `DEEPSEEK_API_KEY` | No | — | DeepSeek fallback API key |
+| `BRIGHTDATA_API_KEY` | No | — | BrightData search API key |
 | `LOG_LEVEL` | No | `INFO` | Logging verbosity |
 
 ### Frontend (`factguard-frontend/.env.local`)
@@ -200,15 +250,14 @@ User submits claim
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `NEXT_PUBLIC_API_URL` | Yes | Backend URL (e.g. `http://localhost:8000`) |
-| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase anon key |
 
 ## Key Design Decisions
 
-- **Async + polling**: Background `asyncio.create_task` with frontend polling preserves the existing UX without WebSockets
-- **Redis dual use**: Claim dedup cache (24h TTL) + ephemeral progress tracking (300s TTL)
+- **Multi-mode architecture**: Single `GET /result/{job_id}?mode=` endpoint serves verify, financial, and cart results — frontend routes to the appropriate view component
+- **Async + polling**: Background `BackgroundTasks` with frontend polling preserves UX without WebSockets
+- **Redis dual use**: Claim dedup cache (24h TTL) + ephemeral progress tracking (300s TTL); also caches `raw_json` by `job_id`
 - **Repeated claims skip Gemini**: Redis cache hit returns immediately — zero API cost
-- **DuckDuckGo every time**: Search runs even for cached claims (search results change); only Gemini call is cached
 - **Key rotation**: Multiple Gemini API keys — rotates on 429/500/503, retries with 1s delay
-- **No fallback caching**: Failed analyses (`_is_fallback`) are never cached — the user can always retry
-- **Graceful degradation**: If Redis or DuckDuckGo is unavailable, the app falls back gracefully
+- **Graceful degradation**: If Redis or a search provider is unavailable, the app falls back gracefully
+- **OG images**: Edge-rendered Open Graph images for social sharing of results
+- **WCAG compliant**: All interactive elements meet 48px minimum touch target

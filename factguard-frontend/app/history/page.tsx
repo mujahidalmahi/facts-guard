@@ -5,6 +5,12 @@ import Link from 'next/link';
 import { Shield, Clock, ArrowRight, AlertCircle } from 'lucide-react';
 import { HistorySkeleton } from '@/components/Skeleton';
 
+const MODE_BADGE = {
+  verify: { label: 'Verify', bg: '#e0f2fe', text: '#0369a1' },
+  financial: { label: 'Financial', bg: '#f0fdf4', text: '#15803d' },
+  cart: { label: 'Cart', bg: '#fef9c3', text: '#854d0e' },
+};
+
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
   'http://localhost:8000';
@@ -14,6 +20,8 @@ interface HistoryItem {
   claim: string;
   status: string;
   createdAt: string;
+  mode?: 'verify' | 'financial' | 'cart';
+  display_text?: string;
 }
 
 function formatDate(
@@ -131,7 +139,13 @@ export default function HistoryPage() {
               >
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-[var(--foreground)] truncate group-hover:text-[var(--accent)] transition-colors">
-                    {c.claim}
+                    <span
+                      style={{ background: (MODE_BADGE[c.mode ?? 'verify']).bg, color: (MODE_BADGE[c.mode ?? 'verify']).text }}
+                      className="text-xs font-bold px-2 py-0.5 rounded-full mr-2"
+                    >
+                      {(MODE_BADGE[c.mode ?? 'verify']).label}
+                    </span>
+                    {c.display_text ?? c.claim}
                   </p>
                   <p className="text-xs text-[var(--muted-foreground)] mt-0.5">
                     {formatDate(

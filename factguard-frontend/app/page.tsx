@@ -1,100 +1,117 @@
 'use client';
 
-import {
-  useState,
-} from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ModeSwitcher } from '@/components/ModeSwitcher';
 import SplashScreen from '@/components/SplashScreen';
-import { PriceCheckSection } from '@/components/PriceCheckSection';
+import type { AppMode } from '@/types';
 
 const API_URL =
-  process.env
-    .NEXT_PUBLIC_API_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
   'http://localhost:8000';
 
+const MODE_CFG = {
+  verify: {
+    headline: 'FactGuard',
+    sub: 'AI-powered trust verification in under 60 seconds',
+    placeholder:
+      'Enter a claim, headline, or statement to verify...',
+    cta: 'Analyse Claim',
+    endpoint: '/verify',
+    field: 'claim',
+    examples: [
+      'The Earth is flat',
+      'WHO confirmed ivermectin cures COVID-19',
+      'Apple is acquiring Netflix',
+    ],
+  },
+
+  financial: {
+    headline: 'Market Intel',
+    sub: 'Real-time price analysis, signals & market prediction',
+    placeholder:
+      'Dollar rate today | Oil price trend | TSLA stock outlook...',
+    cta: 'Analyse Market',
+    endpoint: '/financial',
+    field: 'query',
+    examples: [
+      'Dollar to BDT rate',
+      'Crude oil price trend',
+      'Bitcoin 30-day',
+    ],
+  },
+
+  cart: {
+    headline: 'CartGuard',
+    sub: 'Compare prices · Green = trusted · Red = risky',
+    placeholder:
+      'iPhone 16 Pro 256GB | Sony WH-1000XM5 | RTX 5090...',
+    cta: 'Compare Prices',
+    endpoint: '/cart',
+    field: 'product',
+    examples: [
+      'iPhone 16 Pro',
+      'Sony WH-1000XM5',
+      'RTX 5090 GPU',
+    ],
+  },
+} satisfies Record<AppMode, object>;
+
 export default function HomePage() {
-  const [claim, setClaim] =
-    useState('');
+  const [mode, setMode] =
+    useState<AppMode>('verify');
 
-  const [loading, setLoading] =
-    useState(false);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
   const [showSplash, setShowSplash] =
-    useState(() => {
-      try {
-        return !sessionStorage.getItem('splashShown');
-      } catch {
-        return false;
-      }
-    });
+    useState(false);
 
-  const router =
-    useRouter();
+  const router = useRouter();
 
-  async function handleAnalyse() {
-    if (!claim.trim())
-      return;
-    if (claim.length > 2000) {
-      alert('Claim is too long (max 2000 characters)');
-      return;
+  const cfg =
+    MODE_CFG[mode] as typeof MODE_CFG['verify'];
+
+  useEffect(() => {
+    if (!sessionStorage.getItem('splashShown')) {
+      setShowSplash(true);
     }
+  }, []);
+
+  async function handleSubmit() {
+    if (!input.trim()) return;
+
+    setLoading(true);
 
     try {
-      setLoading(true);
+      const res = await fetch(
+        `${API_URL}${cfg.endpoint}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            [cfg.field]: input,
+          }),
+        }
+      );
 
-      const res =
-        await fetch(
-          `${API_URL}/verify`,
-          {
-            method:
-              'POST',
-            headers: {
-              'Content-Type':
-                'application/json',
-            },
-            body: JSON.stringify(
-              {
-                claim,
-              }
-            ),
-          }
-        );
+      if (!res.ok)
+        throw new Error('Request failed');
 
-      if (!res.ok) {
-        throw new Error(
-          'Failed request'
-        );
-      }
-
-      const data =
-        await res.json();
-
-      const jobId =
-        data.jobId ||
-        'demo';
+      const data = await res.json();
 
       router.push(
-        `/loading?job=${jobId}`
+        `/loading?job=${data.jobId}&mode=${mode}`
       );
-    } catch (error) {
-      console.error(
-        error
-      );
-
-      alert(
-        'Failed to analyse claim'
-      );
+    } catch {
+      alert('Failed — is the backend running?');
     } finally {
       setLoading(false);
     }
   }
 
-  const examples = [
-    'The Earth is flat',
-    'WHO confirmed ivermectin cures COVID-19',
-    'Apple is acquiring Netflix',
-  ];
-
-  if (showSplash) {
+  if (showSplash)
     return (
       <SplashScreen
         onDone={() => {
@@ -106,77 +123,77 @@ export default function HomePage() {
         }}
       />
     );
-  }
 
   return (
-    <main className="min-h-[calc(100vh-3.5rem)] flex flex-col items-center justify-center px-6 bg-[var(--background)]">
-      <h1 className="text-6xl font-bold text-[var(--foreground)] mb-2">
-        FactGuard
-      </h1>
+    <main
+      className='min-h-[calc(100vh-3.5rem)]
+      flex flex-col items-center justify-center
+      px-6 bg-[var(--background)]'
+    >
+      <div className='max-w-3xl w-full text-center space-y-6'>
+        <h1 className='text-6xl font-bold text-[var(--foreground)]'>
+          {cfg.headline}
+        </h1>
 
-      <p className="text-[var(--muted-foreground)] mb-10 text-lg text-center">
-        AI-powered trust verification &amp; price comparison
-      </p>
+        <p className='text-[var(--muted-foreground)] text-lg'>
+          {cfg.sub}
+        </p>
 
-      <div className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-[var(--foreground)]">
-            Analyse Claims
-          </h2>
-
-          <p className="text-[var(--muted-foreground)] mt-2 text-sm">
-            Detect misinformation with AI evidence analysis
-          </p>
-
-          <textarea
-            value={claim}
-            onChange={(e) =>
-              setClaim(
-                e.target.value
-              )
-            }
-            placeholder="Enter a claim to verify..."
-            className="w-full mt-6 h-40 rounded-2xl border border-[var(--card-border)] p-4 text-base outline-none focus:ring-2 focus:ring-[var(--accent)] resize-none bg-[var(--card)] text-[var(--foreground)] placeholder-[var(--muted-foreground)]"
+        <div className='flex justify-center'>
+          <ModeSwitcher
+            current={mode}
+            onChange={(m) => {
+              setMode(m);
+              setInput('');
+            }}
           />
-
-          <button
-            onClick={
-              handleAnalyse
-            }
-            disabled={
-              loading
-            }
-            className="w-full mt-4 bg-[var(--accent)] hover:bg-[var(--accent-hover)] transition-colors text-white py-4 rounded-2xl text-base font-semibold disabled:opacity-60"
-          >
-            {loading
-              ? 'Analysing...'
-              : 'Analyse'}
-          </button>
-
-          <div className="flex flex-wrap justify-center gap-2 mt-6">
-            {examples.map(
-              (
-                example
-              ) => (
-                <button
-                  key={
-                    example
-                  }
-                  onClick={() =>
-                    setClaim(
-                      example
-                    )
-                  }
-                  className="px-3 py-1.5 rounded-full border border-[var(--card-border)] text-xs text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)] transition-colors"
-                >
-                  {example}
-                </button>
-              )
-            )}
-          </div>
         </div>
 
-        <PriceCheckSection />
+        <textarea
+          value={input}
+          onChange={(e) =>
+            setInput(e.target.value)
+          }
+          placeholder={cfg.placeholder}
+          className='w-full mt-4 h-40 rounded-2xl
+          border border-[var(--card-border)]
+          p-5 text-lg outline-none
+          focus:ring-2 focus:ring-[var(--accent)]
+          resize-none bg-[var(--card)]
+          text-[var(--foreground)]
+          placeholder-[var(--muted-foreground)]'
+        />
+
+        <button
+          onClick={handleSubmit}
+          disabled={loading}
+          className='w-full bg-[var(--accent)]
+          hover:bg-[var(--accent-hover)]
+          transition-colors text-white py-4
+          rounded-2xl text-lg font-semibold
+          disabled:opacity-60'
+        >
+          {loading
+            ? 'Processing...'
+            : cfg.cta}
+        </button>
+
+        <div className='flex flex-wrap justify-center gap-3'>
+          {cfg.examples.map((ex) => (
+            <button
+              key={ex}
+              onClick={() => setInput(ex)}
+              className='px-4 py-2 rounded-full
+              border border-[var(--card-border)]
+              text-sm text-[var(--muted-foreground)]
+              hover:bg-[var(--muted)]
+              hover:text-[var(--foreground)]
+              transition-colors'
+            >
+              {ex}
+            </button>
+          ))}
+        </div>
       </div>
     </main>
   );

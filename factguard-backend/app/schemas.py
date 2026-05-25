@@ -107,3 +107,31 @@ class ErrorResponse(BaseModel):
         default_factory=dict,
         description="Additional error details",
     )
+
+
+class FinancialRequest(
+    BaseModel
+):
+    query: str = Field(
+        ...,
+        min_length=2,
+        max_length=500,
+        description="Financial query",
+    )
+
+    @field_validator(
+        "query"
+    )
+    @classmethod
+    def validate_query(
+        cls,
+        v: str,
+    ) -> str:
+        if contains_sql_injection_pattern(
+            v
+        ):
+            raise ValueError(
+                "Invalid query"
+            )
+
+        return v

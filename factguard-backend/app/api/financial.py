@@ -8,62 +8,68 @@ from fastapi import (
 from app.exceptions import (
     ClaimNotFoundError,
 )
+
 from app.logging_config import (
     get_logger,
 )
+
 from app.schemas import (
-    PriceCheckRequest,
+    FinancialRequest,
 )
+
 from app.services.cache import (
     get_progress,
 )
 
-from app.services.pricing import (
-    create_query,
-    get_full_price_result,
-    process_price_check,
+from app.services.financial import (
+    create_financial_query,
+    process_financial_analysis,
+    get_full_financial_result,
 )
 
 from app.utils.constants import (
-    PRICING_PROGRESS_SEARCHING,
     STATUS_PROCESSING,
 )
 
+from app.utils.parsing import (
+    parse_json_response as _parse,
+)
+
 logger = get_logger(
-    "pricing"
+    "financial"
 )
 
 router = APIRouter()
 
 
-@router.post("/cart")
-async def cart(
-    payload:
-    PriceCheckRequest,
-    background_tasks:
-    BackgroundTasks,
+@router.post(
+    "/financial"
+)
+async def financial(
+    payload: FinancialRequest,
+    background_tasks: BackgroundTasks,
 ):
     job_id = str(
         uuid.uuid4()
     )
 
     logger.info(
-        f"Starting cart check "
-        f"(job_id: {job_id}, "
-        f"product: {payload.product})"
+        f"Starting financial analysis "
+        f"(job_id={job_id}, "
+        f"query={payload.query})"
     )
 
     query_id = (
-        await create_query(
-            payload.product,
+        await create_financial_query(
+            payload.query,
             job_id,
         )
     )
 
     background_tasks.add_task(
-        process_price_check,
+        process_financial_analysis,
         query_id,
-        payload.product,
+        payload.query,
         job_id,
     )
 
@@ -72,28 +78,14 @@ async def cart(
     }
 
 
-# legacy compatibility
-@router.post("/price-check")
-async def price_check(
-    payload:
-    PriceCheckRequest,
-    background_tasks:
-    BackgroundTasks,
-):
-    return await cart(
-        payload,
-        background_tasks,
-    )
-
-
 @router.get(
-    "/price-result/{job_id}"
+    "/financial-result/{job_id}"
 )
-async def get_price_result(
+async def get_financial_result(
     job_id: str,
 ):
     data = (
-        await get_full_price_result(
+        await get_full_financial_result(
             job_id
         )
     )
@@ -124,7 +116,7 @@ async def get_price_result(
                 job_id,
             "progress":
                 progress
-                or PRICING_PROGRESS_SEARCHING,
+                or "Fetching market data...",
         }
 
     return data

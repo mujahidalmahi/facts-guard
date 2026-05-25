@@ -1,27 +1,85 @@
 'use client';
 
-import { use, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import {
+  use,
+  useEffect,
+  useState,
+} from 'react';
+
+import {
+  useSearchParams,
+} from 'next/navigation';
+
 import { motion } from 'framer-motion';
 import { Download } from 'lucide-react';
 
-import { VerdictBadge } from '@/components/VerdictBadge';
-import { ConfidencePill } from '@/components/ConfidencePill';
-import { AgreementMeter } from '@/components/AgreementMeter';
-import { EvidenceTimeline } from '@/components/EvidenceTimeline';
-import { ShareCard } from '@/components/ShareCard';
+import {
+  VerdictBadge,
+} from '@/components/VerdictBadge';
+
+import {
+  ConfidencePill,
+} from '@/components/ConfidencePill';
+
+import {
+  AgreementMeter,
+} from '@/components/AgreementMeter';
+
+import {
+  EvidenceTimeline,
+} from '@/components/EvidenceTimeline';
+
+import {
+  ShareCard,
+} from '@/components/ShareCard';
+
+import {
+  ResultSkeleton,
+} from '@/components/Skeleton';
+
 import {
   Source,
   Verdict,
   Confidence,
 } from '@/types';
-import { ResultSkeleton } from '@/components/Skeleton';
+
+import {
+  ResultErrorBoundary,
+} from '@/components/ResultErrorBoundary';
+
+import {
+  FinancialResultView,
+} from './FinancialResultView';
+
+import {
+  CartResultView,
+} from './CartResultView';
 
 const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
+  process.env
+    .NEXT_PUBLIC_API_URL ||
   'http://localhost:8000';
 
+/**
+ * Unified endpoint
+ * Everything now uses:
+ * /result/{jobId}?mode=...
+ */
+const ENDPOINT_MAP:
+  Record<string, string> =
+{
+  verify:
+    '/result',
+
+  financial:
+    '/result',
+
+  cart:
+    '/result',
+};
+
 type ResultData = {
+  mode?: string;
   claim?: string;
   verdict?: Verdict;
   confidence?: Confidence;
@@ -32,105 +90,42 @@ type ResultData = {
   sources?: Source[];
 };
 
-function esc(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;');
-}
-
 function downloadResult(
   data: ResultData
 ) {
-  const stanceLabel = (
-    s: string
-  ) =>
-    s === 'supports'
-      ? '✅ Supports'
-      : s === 'contradicts'
-        ? '❌ Contradicts'
-        : '➖ Neutral';
+  const blob =
+    new Blob(
+      [
+        JSON.stringify(
+          data,
+          null,
+          2
+        ),
+      ],
+      {
+        type:
+          'application/json',
+      }
+    );
 
-  const rows = (
-    data.sources ?? []
-  )
-    .map(
-      (s) => `
-    <tr>
-      <td style="padding:8px;border:1px solid #ddd"><a href="${esc(s.url)}" style="color:#6366f1">${esc(s.title)}</a></td>
-      <td style="padding:8px;border:1px solid #ddd">${esc(s.url)}</td>
-      <td style="padding:8px;border:1px solid #ddd">${esc(stanceLabel(s.stance))}</td>
-      <td style="padding:8px;border:1px solid #ddd">${s.relevance}/10</td>
-      <td style="padding:8px;border:1px solid #ddd">${esc(s.summary)}</td>
-      ${s.quote ? `<td style="padding:8px;border:1px solid #ddd">“${esc(s.quote)}”</td>` : ''}
-    </tr>`
-    )
-    .join('');
-
-  const claim = esc(
-    data.claim ?? ''
-  );
-  const verdict = esc(
-    data.verdict ?? 'Unverified'
-  );
-  const confidence = esc(
-    data.confidence ?? 'Low'
-  );
-  const summary = esc(
-    data.summary ??
-      'No summary available.'
-  );
-
-  const html = `<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><title>FactGuard Report</title></head>
-<body style="font-family:sans-serif;max-width:800px;margin:40px auto;padding:20px;color:#1e293b">
-  <h1 style="color:#6366f1">FactGuard Report</h1>
-  <p style="color:#64748b;font-size:14px">AI-powered fact check · ${new Date().toLocaleDateString()}</p>
-
-  <h2>Claim</h2>
-  <p style="font-size:18px;background:#f8fafc;padding:16px;border-radius:8px">${claim}</p>
-
-  <h2>Verdict: ${verdict}</h2>
-  <p><strong>Confidence:</strong> ${confidence}</p>
-
-  <h2>Summary</h2>
-  <p>${summary}</p>
-
-  <h2>Source Breakdown</h2>
-  <p>Supports: ${data.supports ?? 0} · Neutral: ${data.neutral ?? 0} · Contradicts: ${data.contradicts ?? 0}</p>
-
-  ${rows ? `<h2>Sources (${(data.sources ?? []).length})</h2>
-  <table style="width:100%;border-collapse:collapse;font-size:13px">
-    <thead><tr style="background:#f1f5f9">
-      <th style="padding:8px;border:1px solid #ddd;text-align:left">Title</th>
-      <th style="padding:8px;border:1px solid #ddd;text-align:left">URL</th>
-      <th style="padding:8px;border:1px solid #ddd;text-align:left">Stance</th>
-      <th style="padding:8px;border:1px solid #ddd;text-align:left">Relevance</th>
-      <th style="padding:8px;border:1px solid #ddd;text-align:left">Summary</th>
-      ${(data.sources ?? []).some(s => s.quote) ? '<th style="padding:8px;border:1px solid #ddd;text-align:left">Quote</th>' : ''}
-    </tr></thead>
-    <tbody>${rows}</tbody>
-  </table>` : ''}
-
-  <p style="margin-top:32px;font-size:12px;color:#94a3b8">Generated by FactGuard</p>
-</body></html>`;
-
-  const blob = new Blob(
-    [html],
-    { type: 'text/html' }
-  );
   const a =
     document.createElement(
       'a'
     );
+
   a.href =
-    URL.createObjectURL(blob);
-  a.download = `factguard-${(data.claim ?? '').slice(0, 40).replace(/\s+/g, '-').toLowerCase() || 'report'}.html`;
+    URL.createObjectURL(
+      blob
+    );
+
+  a.download =
+    'factguard-report.json';
+
   a.click();
-  URL.revokeObjectURL(a.href);
+
+  URL.revokeObjectURL(
+    a.href
+  );
 }
 
 export default function ResultPage({
@@ -140,148 +135,204 @@ export default function ResultPage({
     jobId: string;
   }>;
 }) {
-  const { jobId } = use(params);
-  const router = useRouter();
+  const {
+    jobId,
+  } = use(params);
 
-  const [data, setData] =
-    useState<ResultData | null>(
-      null
-    );
-  const [error, setError] = useState(false);
+  const searchParams =
+    useSearchParams();
+
+  const mode =
+    searchParams.get(
+      'mode'
+    ) || 'verify';
+
+  const endpoint =
+    ENDPOINT_MAP[
+      mode
+    ] ??
+    '/result';
+
+  const [
+    data,
+    setData,
+  ] = useState<any>(
+    null
+  );
+
+  const [
+    error,
+    setError,
+  ] = useState(false);
 
   useEffect(() => {
-    const controller =
-      new AbortController();
+    let attempts =
+      0;
 
-    fetch(
-      `${API_URL}/result/${jobId}`,
-      {
-        signal:
-          controller.signal,
+    const MAX =
+      40;
+
+    const INTERVAL =
+      1500;
+
+    let timer:
+      | ReturnType<
+          typeof setTimeout
+        >
+      | undefined;
+
+    async function poll() {
+      attempts++;
+
+      if (
+        attempts >
+        MAX
+      ) {
+        setError(
+          true
+        );
+
+        return;
       }
-    )
-      .then((res) => {
-        if (!res.ok)
-          throw new Error(
-            res.status === 404
-              ? 'Result not found'
-              : 'Server error'
+
+      try {
+        const res =
+          await fetch(
+            `${API_URL}${endpoint}/${jobId}?mode=${mode}`
           );
-        return res.json();
-      })
-      .then((result) => {
+
         if (
-          controller.signal
-            .aborted
-        )
-          return;
-        if (
-          result.status &&
-          result.status ===
-            'processing'
+          !res.ok
         ) {
-          router.push(
-            `/loading?job=${jobId}`
+          throw new Error(
+            String(
+              res.status
+            )
           );
+        }
+
+        const result =
+          await res.json();
+
+        if (
+          result.status ===
+          'processing'
+        ) {
+          timer =
+            setTimeout(
+              poll,
+              INTERVAL
+            );
+
           return;
         }
-        setData({
-          claim:
-            result.claim,
-          verdict:
-            result.verdict ??
-            'Unverified',
-          confidence:
-            result.confidence ??
-            'Low',
-          summary:
-            result.summary,
-          supports:
-            result.supports,
-          contradicts:
-            result.contradicts,
-          neutral:
-            result.neutral,
-          sources:
-            result.sources ??
-            [],
-        });
-      })
-      .catch((err) => {
-        if (
-          controller.signal
-            .aborted
-        )
-          return;
-        setError(true);
-        console.error(err);
-      });
 
-    return () =>
-      controller.abort();
-  }, [jobId, router]);
+        setData(
+          result
+        );
+      } catch (
+        err
+      ) {
+        console.error(
+          err
+        );
+
+        setError(
+          true
+        );
+      }
+    }
+
+    poll();
+
+    return () => {
+      if (
+        timer
+      ) {
+        clearTimeout(
+          timer
+        );
+      }
+    };
+  }, [
+    jobId,
+    endpoint,
+    mode,
+  ]);
 
   if (error) {
     return (
-      <main className="min-h-[calc(100vh-3.5rem)] flex flex-col items-center justify-center gap-4 px-6">
-        <p className="text-red-600 text-lg font-semibold">
-          Failed to load result
-        </p>
-        <p className="text-[var(--muted-foreground)] text-sm">
-          The claim could not be verified. Please try again.
-        </p>
-        <button
-          onClick={() => window.location.reload()}
-          className="px-4 py-2 bg-[var(--accent)] text-white rounded-lg text-sm hover:bg-[var(--accent-hover)] transition-colors"
-        >
-          Retry
-        </button>
+      <main className='min-h-screen flex items-center justify-center'>
+        Failed to load result
       </main>
     );
   }
 
   if (!data) {
-    return <ResultSkeleton />;
+    return (
+      <ResultSkeleton />
+    );
+  }
+
+  if (
+    data.mode ===
+    'financial'
+  ) {
+    return (
+      <ResultErrorBoundary>
+        <FinancialResultView
+          data={data}
+        />
+      </ResultErrorBoundary>
+    );
+  }
+
+  if (
+    data.mode ===
+    'cart'
+  ) {
+    return (
+      <ResultErrorBoundary>
+        <CartResultView
+          data={data}
+        />
+      </ResultErrorBoundary>
+    );
   }
 
   return (
-    <main className="max-w-3xl mx-auto px-4 py-10 space-y-8">
+    <main className='max-w-3xl mx-auto px-4 py-10 space-y-8'>
       <motion.div
-        initial={{ opacity: 0, y: -12 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="rounded-xl border border-[var(--card-border)] bg-[var(--card)] p-5 shadow-sm"
+        initial={{
+          opacity: 0,
+          y: -12,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+        }}
+        className='rounded-xl border border-[var(--card-border)] bg-[var(--card)] p-5 shadow-sm'
       >
-        <p className="text-xs text-[var(--muted-foreground)] uppercase tracking-widest font-semibold mb-1">
+        <p className='text-xs text-[var(--muted-foreground)] uppercase tracking-widest font-semibold mb-1'>
           Claim
         </p>
-        <p className="text-lg font-medium text-[var(--foreground)]">
-          &ldquo;{data.claim}&rdquo;
+
+        <p className='text-lg font-medium'>
+          "
+          {
+            data.claim
+          }
+          "
         </p>
       </motion.div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <motion.div
-          initial={{
-            opacity: 0,
-            scale: 0.8,
-          }}
-          animate={{
-            opacity: 1,
-            scale: 1,
-          }}
-          transition={{
-            type: 'spring',
-            stiffness: 260,
-            damping: 20,
-          }}
-        >
-          <VerdictBadge
-            verdict={
-              data.verdict ??
-              'Unverified'
-            }
-          />
-        </motion.div>
+      <div className='flex flex-wrap gap-3'>
+        <VerdictBadge
+          verdict={
+            data.verdict ??
+            'Unverified'
+          }
+        />
 
         <ConfidencePill
           confidence={
@@ -291,50 +342,49 @@ export default function ResultPage({
         />
       </div>
 
-      <p className="text-[var(--foreground)] leading-relaxed text-base">
-        {data.summary ||
-          'No summary available.'}
+      <p>
+        {
+          data.summary
+        }
       </p>
 
       <AgreementMeter
         supports={
-          data.supports ?? 0
+          data.supports ??
+          0
         }
         contradicts={
           data.contradicts ??
           0
         }
         neutral={
-          data.neutral ?? 0
+          data.neutral ??
+          0
         }
       />
 
-      <section>
-        <h2 className="text-lg font-semibold text-[var(--foreground)] mb-3">
-          Evidence Sources
-        </h2>
+      <EvidenceTimeline
+        sources={
+          data.sources ??
+          []
+        }
+      />
 
-        <EvidenceTimeline
-          sources={
-            data.sources ??
-            []
-          }
-        />
-      </section>
-
-      <div className="flex items-center gap-3">
+      <div className='flex gap-3'>
         <ShareCard
-          jobId={jobId}
+          jobId={
+            jobId
+          }
         />
 
         <button
           onClick={() =>
-            downloadResult(data)
+            downloadResult(
+              data
+            )
           }
-          className="flex items-center gap-2 shrink-0 text-xs font-semibold text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors px-3 py-2 rounded-lg border border-[var(--card-border)] hover:bg-[var(--muted)]"
         >
-          <Download className="size-3.5" />
-          Download
+          <Download />
         </button>
       </div>
     </main>

@@ -1,6 +1,9 @@
 import asyncio
 import json
-from datetime import datetime, timezone
+from datetime import (
+    datetime,
+    timezone,
+)
 
 from google.api_core.exceptions import (
     InternalServerError,
@@ -8,17 +11,30 @@ from google.api_core.exceptions import (
     ServiceUnavailable,
 )
 
-from app.dependencies import get_gemini_service
-from app.logging_config import get_logger
-from app.services.cache import set_progress
-from app.utils.search import search_claim
+from app.dependencies import (
+    get_gemini_service,
+)
+from app.logging_config import (
+    get_logger,
+)
+from app.services.cache import (
+    set_progress,
+)
+from app.utils.search import (
+    search_claim,
+)
 
-logger = get_logger("gemini")
+logger = get_logger(
+    "gemini"
+)
 
 FALLBACK_RESPONSE = {
-    "verdict": "Unverified",
-    "confidence": "Low",
-    "summary": "Could not analyze claim. Please try again.",
+    "verdict":
+        "Unverified",
+    "confidence":
+        "Low",
+    "summary":
+        "Could not analyze claim. Please try again.",
     "supports": 0,
     "contradicts": 0,
     "neutral": 0,
@@ -26,35 +42,81 @@ FALLBACK_RESPONSE = {
     "_is_fallback": True,
 }
 
-REQUIRED_KEYS = {"verdict", "confidence", "summary", "supports", "contradicts", "neutral"}
+REQUIRED_KEYS = {
+    "verdict",
+    "confidence",
+    "summary",
+    "supports",
+    "contradicts",
+    "neutral",
+}
 
 
-def _validate_response(result: dict) -> bool:
-    missing = REQUIRED_KEYS - set(result.keys())
+def _validate_response(
+    result: dict,
+) -> bool:
+    missing = (
+        REQUIRED_KEYS
+        - set(result.keys())
+    )
+
     if missing:
-        logger.warning(f"LLM response missing required keys: {missing}")
+        logger.warning(
+            f"LLM response missing required keys: {missing}"
+        )
         return False
+
     return True
 
 
-async def analyze_claim(claim: str, job_id: str | None = None) -> dict:
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+async def analyze_claim(
+    claim: str,
+    job_id:
+    str | None = None,
+) -> dict:
+    today = datetime.now(
+        timezone.utc
+    ).strftime("%Y-%m-%d")
 
     if job_id:
-        await set_progress(job_id, "Searching DuckDuckGo...")
-    search_results = await search_claim(claim)
+        await set_progress(
+            job_id,
+            "Searching via Bright Data...",
+        )
+
+    search_results = (
+        await search_claim(
+            claim
+        )
+    )
+
     search_context = ""
+
     if search_results:
         lines = []
-        for i, r in enumerate(search_results, 1):
-            lines.append(f"{i}. \"{r['title']}\"")
-            lines.append(f"   URL: {r['url']}")
-            lines.append(f"   Snippet: {r['snippet']}")
-        search_context = "\n".join(lines)
+
+        for i, r in enumerate(
+            search_results,
+            1,
+        ):
+            lines.append(
+                f'{i}. "{r["title"]}"'
+            )
+            lines.append(
+                f'   URL: {r["url"]}'
+            )
+            lines.append(
+                f'   Snippet: {r["snippet"]}'
+            )
+
+        search_context = (
+            "\n".join(lines)
+        )
 
     search_section = f"""
 Use these live web search results about this claim as your primary evidence.
-Base your analysis on these real sources. Do NOT fabricate sources.
+Base your analysis on these real sources.
+Do NOT fabricate sources.
 
 Web Search Results:
 {search_context or "No web search results found. Use your best judgment."}
@@ -108,46 +170,145 @@ JSON format:
 }}
 """
 
-    gemini_service = get_gemini_service()
-    max_retries = len(gemini_service.api_keys)
+    gemini_service = (
+        get_gemini_service()
+    )
 
-    for attempt in range(max_retries):
+    max_retries = len(
+        gemini_service.api_keys
+    )
+
+    for attempt in range(
+        max_retries
+    ):
         try:
             if job_id:
-                await set_progress(job_id, "Analyzing with AI...")
-            model = gemini_service.get_model()
-            response = await asyncio.to_thread(model.generate_content, prompt)
+                await set_progress(
+                    job_id,
+                    "Analysing with AI...",
+                )
+
+            model = (
+                gemini_service.get_model()
+            )
+
+            # 30-second timeout fix
+            response = (
+                await asyncio.wait_for(
+                    asyncio.to_thread(
+                        model.generate_content,
+                        prompt,
+                    ),
+                    timeout=30.0,
+                )
+            )
 
             text = (
                 response.text
-                .replace("```json", "")
-                .replace("```", "")
+                .replace(
+                    "```json",
+                    "",
+                )
+                .replace(
+                    "```",
+                    "",
+                )
                 .strip()
             )
 
-            result = json.loads(text)
+            result = json.loads(
+                text
+            )
 
-            if not _validate_response(result):
-                return dict(FALLBACK_RESPONSE)
+            if not _validate_response(
+                result
+            ):
+                return dict(
+                    FALLBACK_RESPONSE
+                )
 
-            logger.info("Claim analysis completed successfully")
+            logger.info(
+                "Claim analysis completed successfully"
+            )
+
             return result
 
-        except (ResourceExhausted, InternalServerError, ServiceUnavailable):
-            remaining = max_retries - attempt - 1
-            logger.warning(f"Gemini API key exhausted (attempt {attempt + 1}/{max_retries}), rotating to next key")
+        except asyncio.TimeoutError:
+            logger.warning(
+                f"Gemini timeout on attempt {attempt + 1}"
+            )
+
+            remaining = (
+                max_retries
+                - attempt
+                - 1
+            )
+
             if remaining > 0:
                 gemini_service.rotate_key()
-                await asyncio.sleep(1)
+
+                await asyncio.sleep(
+                    1
+                )
+
+                continue
+
+            return {
+                **FALLBACK_RESPONSE,
+                "summary":
+                    "AI analysis timed out.",
+            }
+
+        except (
+            ResourceExhausted,
+            InternalServerError,
+            ServiceUnavailable,
+        ):
+            remaining = (
+                max_retries
+                - attempt
+                - 1
+            )
+
+            logger.warning(
+                f"Gemini API key exhausted "
+                f"(attempt {attempt + 1}/{max_retries}), "
+                f"rotating to next key"
+            )
+
+            if remaining > 0:
+                gemini_service.rotate_key()
+
+                await asyncio.sleep(
+                    1
+                )
+
             continue
 
         except json.JSONDecodeError as e:
-            logger.warning(f"JSON parsing failed: {str(e)}, returning default")
-            return dict(FALLBACK_RESPONSE)
+            logger.warning(
+                f"JSON parsing failed: {str(e)}"
+            )
+
+            return dict(
+                FALLBACK_RESPONSE
+            )
 
         except Exception as e:
-            logger.error(f"Unexpected error during analysis: {str(e)}")
-            return dict(FALLBACK_RESPONSE)
+            logger.error(
+                f"Unexpected error during analysis: {str(e)}"
+            )
 
-    logger.error("All API key retries exhausted")
-    return {**FALLBACK_RESPONSE, "summary": "All API keys exhausted. Please try again later."}
+            return dict(
+                FALLBACK_RESPONSE
+            )
+
+    logger.error(
+        "All API key retries exhausted"
+    )
+
+    return {
+        **FALLBACK_RESPONSE,
+        "summary":
+            "All API keys exhausted. Please try again later.",
+    }
