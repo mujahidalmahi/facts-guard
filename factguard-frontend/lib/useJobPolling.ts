@@ -6,11 +6,14 @@ import { useRouter } from 'next/navigation'
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 const POLL_INTERVAL = 1500
+const MAX_ATTEMPTS = 30
 
 const PROGRESS_ICONS: Record<string, string> = {
   'Checking cache...': '🔍',
   'Searching DuckDuckGo...': '🌐',
+  'Searching via Bright Data...': '🌐',
   'Analyzing with AI...': '🤖',
+  'Analysing with AI...': '🤖',
   'Saving results...': '💾',
   'Searching for prices...': '🔍',
   'Analyzing product data...': '📊',
@@ -20,10 +23,21 @@ const PROGRESS_ICONS: Record<string, string> = {
 export function useJobPolling(jobId: string, resultPath: string, progressSteps: string[], mode: string = 'verify') {
   const router = useRouter()
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const attemptRef = useRef(0)
   const [progress, setProgress] = useState('Processing...')
 
   useEffect(() => {
+    attemptRef.current = 0
+
     async function poll() {
+      attemptRef.current++
+
+      if (attemptRef.current > MAX_ATTEMPTS) {
+        setProgress('Failed')
+        clearInterval(intervalRef.current!)
+        return
+      }
+
       try {
         const res = await fetch(`${API_URL}/${resultPath}/${jobId}?mode=${mode}`)
         if (!res.ok) return

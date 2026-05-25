@@ -14,7 +14,7 @@ const PROGRESS_STEPS = [
 function LoadingContent() {
   const searchParams = useSearchParams()
   const jobId = searchParams.get('job') || 'demo'
-  const { progress, icon, pct } = useJobPolling(jobId, 'price-result', PROGRESS_STEPS)
+  const { progress, icon, pct } = useJobPolling(jobId, 'result', PROGRESS_STEPS)
 
   return (
     <main className="min-h-[calc(100vh-3.5rem)] flex items-center justify-center bg-[var(--background)] px-6">

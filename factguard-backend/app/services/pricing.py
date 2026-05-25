@@ -107,95 +107,101 @@ def _build_ai_analysis(
     ai_enrichment: dict | None,
     listings_data: list[dict],
 ) -> dict:
+    prices = [
+        x.get("price") for x in listings_data
+        if x.get("price") is not None
+    ]
+    low_price = str(min(prices, default=0))
+    high_price = str(max(prices, default=0))
+    product_name = (
+        listings_data[0].get("title", "")
+        if listings_data else ""
+    )
+
     if not ai_enrichment:
         return {
+            "product_name": product_name,
+            "msrp": None,
+            "fair_market_range": {
+                "min": low_price,
+                "max": high_price,
+                "currency": "USD",
+            },
             "best_deal": {
-                "platform":
-                    listings_data[0].get(
-                        "merchant", "Unknown"
-                    )
+                "merchant":
+                    listings_data[0].get("merchant", "Unknown")
                 if listings_data
                 else "Unknown",
                 "price":
-                    str(listings_data[0].get("price", "N/A"))
+                    f"${low_price}"
                 if listings_data
                 else "N/A",
-                "why": "Lowest trusted result",
+                "url":
+                    listings_data[0].get("url", "")
+                if listings_data
+                else "",
+                "reason": "Lowest trusted result",
             },
-            "verdict":
-                f"Found {len(listings_data)} listings",
-            "price_range": {
-                "low": str(min(
-                    [x.get("price") for x in listings_data if x.get("price") is not None],
-                    default=0,
-                )),
-                "high": str(max(
-                    [x.get("price") for x in listings_data if x.get("price") is not None],
-                    default=0,
-                )),
+            "analysis": {
+                "warnings": [],
+                "recommendation":
+                    "Compare seller reputation before purchasing.",
+                "price_trend": "Stable",
+                "best_time_to_buy": "Wait",
             },
-            "recommendation":
-                "Compare seller reputation before purchasing.",
-            "warnings": [],
-            "market_average": "Dynamic",
         }
 
     best_deal = ai_enrichment.get("best_deal")
     return {
+        "product_name": product_name,
+        "msrp": None,
+        "fair_market_range": {
+            "min":
+                str(
+                    ai_enrichment
+                    .get("price_range", {})
+                    .get("low", low_price)
+                ),
+            "max":
+                str(
+                    ai_enrichment
+                    .get("price_range", {})
+                    .get("high", high_price)
+                ),
+            "currency": "USD",
+        },
         "best_deal": {
-            "platform":
+            "merchant":
                 best_deal.get("platform", "Unknown")
             if best_deal
             else "Unknown",
             "price":
-                str(best_deal.get("price", "N/A"))
+                f"${best_deal.get('price', low_price)}"
             if best_deal
-            else "N/A",
-            "why":
+            else f"${low_price}",
+            "url":
+                best_deal.get("url", "")
+            if best_deal
+            else "",
+            "reason":
                 best_deal.get("why", "")
             if best_deal
             else "",
         },
-        "verdict":
-            ai_enrichment.get(
-                "verdict",
-                f"Found {len(listings_data)} listings",
-            ),
-        "price_range": {
-            "low":
-                str(
-                    ai_enrichment
-                    .get("price_range", {})
-                    .get("low", 0)
-                ),
-            "high":
-                str(
-                    ai_enrichment
-                    .get("price_range", {})
-                    .get("high", 0)
-                ),
-        },
-        "recommendation":
-            ai_enrichment.get(
-                "recommendation",
-                "Compare seller reputation before purchasing.",
-            ),
-        "warnings":
-            ai_enrichment.get(
-                "warnings",
-                [],
-            ),
-        "market_average":
-            str(
+        "analysis": {
+            "warnings":
                 ai_enrichment.get(
-                    "market_average",
-                    "Dynamic",
-                )
-            ),
-        "variant_notes":
-            ai_enrichment.get(
-                "variant_notes",
-            ),
+                    "warnings",
+                    [],
+                ),
+            "recommendation":
+                ai_enrichment.get(
+                    "recommendation",
+                    "Compare seller reputation before purchasing.",
+                ),
+            "price_trend": "Stable",
+            "best_time_to_buy": "Wait",
+        },
     }
 
 
@@ -224,16 +230,25 @@ def _listing_to_response(
     )
 
     return {
-        "platform":
+        "title":
+            l.get(
+                "title",
+                "",
+            ),
+
+        "merchant":
             l.get(
                 "merchant",
                 "Unknown",
             ),
 
-        "title":
+        "price":
+            l.get("price"),
+
+        "currency":
             l.get(
-                "title",
-                "",
+                "currency",
+                "USD",
             ),
 
         "url":
@@ -242,14 +257,20 @@ def _listing_to_response(
                 "",
             ),
 
-        "snippet":
+        "trust_level":
+            trust_signal.upper(),
+
+        "deal_score": 0,
+        "trust_reason": "",
+        "counterfeit_risk": "None",
+
+        "condition":
             l.get(
-                "title",
-                "",
+                "condition",
+                "Unknown",
             ),
 
-        "trust_signal":
-            trust_signal,
+        "in_stock": True,
     }
 
 

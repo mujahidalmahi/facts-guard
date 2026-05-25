@@ -238,6 +238,17 @@ export default function ResultPage({
           return;
         }
 
+        if (
+          result.status ===
+          'error'
+        ) {
+          setError(
+            true
+          );
+
+          return;
+        }
+
         setData(
           result
         );
@@ -273,8 +284,22 @@ export default function ResultPage({
 
   if (error) {
     return (
-      <main className='min-h-screen flex items-center justify-center'>
-        Failed to load result
+      <main className='min-h-screen flex flex-col items-center justify-center gap-4'>
+        <p className='text-[var(--muted-foreground)]'>
+          Failed to load result
+        </p>
+        <button
+          onClick={() => {
+            setError(false);
+            setData(null);
+            window.location.reload();
+          }}
+          className='px-4 py-2 text-sm font-semibold rounded-lg
+            bg-[var(--accent)] text-white
+            hover:bg-[var(--accent-hover)] transition-colors'
+        >
+          Retry
+        </button>
       </main>
     );
   }

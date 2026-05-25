@@ -1,0 +1,5 @@
+[2026-05-25 15:20:16] INFO     factguard.main:lifespan:63 - All required env vars present
+INFO:     127.0.0.1:55727 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62782 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54965 - "GET /terminate HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:54706 - "GET /health HTTP/1.1" 200 OK

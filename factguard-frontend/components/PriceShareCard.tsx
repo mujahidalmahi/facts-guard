@@ -28,7 +28,7 @@ export function PriceShareCard({
 }: PriceShareCardProps) {
   const [copied, setCopied] = useState(false);
 
-  const url = `${window.location.origin}/price-result/${jobId}`;
+  const url = `${window.location.origin}/result/${jobId}`;
 
   async function copy() {
     try {

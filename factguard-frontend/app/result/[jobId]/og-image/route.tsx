@@ -34,11 +34,12 @@ export async function GET(
   let mode = 'verify';
 
   try {
-    const res = await fetch(`${apiUrl}/result/${jobId}`);
+    const modeParam = req.nextUrl.searchParams.get('mode') || 'verify';
+    const res = await fetch(`${apiUrl}/result/${jobId}?mode=${modeParam}`);
     const data = await res.json();
-    verdict = data.verdict ?? verdict;
-    summary = (data.summary ?? summary).slice(0, 120);
-    mode = data.mode ?? 'verify';
+    verdict = data.verdict ?? data.signal ?? verdict;
+    summary = (data.summary ?? data.query ?? summary).slice(0, 120);
+    mode = data.mode ?? modeParam;
   } catch {}
 
   const color = VERDICT_COLOR[verdict] ?? '#6366f1';

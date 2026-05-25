@@ -7,6 +7,17 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { jobId } = await params;
 
+  let mode = 'verify';
+  try {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const res = await fetch(`${apiUrl}/result/${jobId}?mode=verify`, {
+      signal: AbortSignal.timeout(3000),
+    });
+    const data = await res.json();
+    if (data.mode) mode = data.mode;
+  } catch {}
+
+  const ogUrl = `/result/${jobId}/og-image?mode=${mode}`;
   const title = 'FactGuard - Analysis Result';
   const desc = 'AI-powered fact verification & market analysis';
 
@@ -16,13 +27,13 @@ export async function generateMetadata({
     openGraph: {
       title,
       description: desc,
-      images: [`/result/${jobId}/og-image`],
+      images: [ogUrl],
     },
     twitter: {
       card: 'summary_large_image',
       title,
       description: desc,
-      images: [`/result/${jobId}/og-image`],
+      images: [ogUrl],
     },
   };
 }
