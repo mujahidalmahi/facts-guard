@@ -8,6 +8,8 @@ from app.services.db import (
     select,
     update,
 )
+from datetime import datetime, timezone
+
 from app.utils.constants import (
     PRICING_PROGRESS_ANALYZING,
     PRICING_PROGRESS_SAVING,
@@ -19,6 +21,7 @@ from app.utils.constants import (
 from app.services.cache import (
     compute_claim_hash,
     get_cached_analysis,
+    push_claim_to_history,
     set_cached_analysis,
     set_progress,
 )
@@ -719,6 +722,13 @@ async def process_price_check(
             "id",
             query_id,
         )
+
+        await push_claim_to_history({
+            "jobId": job_id,
+            "claim": f"[CART] {product_name}",
+            "status": STATUS_DONE,
+            "createdAt": datetime.now(timezone.utc).isoformat(),
+        })
 
         logger.info(
             f"Price check "

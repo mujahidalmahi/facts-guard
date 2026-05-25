@@ -14,50 +14,51 @@ logger = get_logger(
     "deepseek"
 )
 
-client = OpenAI(
-    api_key=
-        settings.DEEPSEEK_API_KEY,
-    base_url=
-        "https://openrouter.ai/api/v1",
-)
+_client = None
+
+def _get_client():
+    global _client
+    if _client is None:
+        key = settings.DEEPSEEK_API_KEY
+        if not key:
+            raise ValueError("DEEPSEEK_API_KEY not configured")
+        _client = OpenAI(
+            api_key=key,
+            base_url="https://openrouter.ai/api/v1",
+        )
+    return _client
 
 
 async def deepseek_financial_analysis(
     query: str,
-    market_context: str,
+    context: str,
 ) -> dict:
     try:
         prompt = f"""
-You are a financial AI analyst.
+You are a financial AI analyst. Use the live web search results below to answer the user's query.
 
-Analyze:
+User Query: {query}
 
-{query}
+Web Search Results:
+{context or "No web search results available. Use your best judgment."}
 
-Market Data:
-{market_context}
+Return ONLY valid JSON with these fields:
+- "signal": "BUY" | "SELL" | "HOLD"
+- "signal_strength": "Weak" | "Moderate" | "Strong"
+- "price_trend": "Bullish" | "Bearish" | "Sideways"
+- "summary": 2-3 sentence explanation with specific data from search results
+- "risk_level": "Low" | "Medium" | "High"
+- "prediction_30d": brief outlook
+- "confidence": "Low" | "Medium" | "High"
+- "key_factors": list of 2-4 key factors
 
-Return ONLY JSON.
-
-{{
-  "signal": "BUY | SELL | HOLD",
-  "signal_strength": "Weak | Moderate | Strong",
-  "price_trend": "Bullish | Bearish | Sideways",
-  "summary": "short explanation",
-  "risk_level": "Low | Medium | High",
-  "prediction_30d": "brief prediction",
-  "confidence": "Low | Medium | High",
-  "key_factors": [
-    "factor 1",
-    "factor 2"
-  ]
-}}
+Do NOT wrap in markdown. Return raw JSON only.
 """
 
         response = (
-            client.chat.completions.create(
+            _get_client().chat.completions.create(
                 model=
-                    "deepseek/deepseek-chat-v3",
+                    "deepseek/deepseek-v4-flash:free",
                 messages=[
                     {
                         "role":

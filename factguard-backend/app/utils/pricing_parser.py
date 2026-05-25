@@ -194,14 +194,16 @@ def cluster_listings(listings: list[dict]) -> list[dict]:
         prices = data["prices"]
         if prices:
             lo, hi = min(prices), max(prices)
+            data["min_price"] = lo
             if lo == hi:
                 data["priceRange"] = f"${lo:,.2f}"
             else:
                 data["priceRange"] = f"${lo:,.2f} – ${hi:,.2f}"
         else:
+            data["min_price"] = float("inf")
             data["priceRange"] = "Price unavailable"
         del data["prices"]
         result.append(data)
 
-    result.sort(key=lambda v: v.get("priceRange", ""))
+    result.sort(key=lambda v: v.get("min_price", float("inf")))
     return result

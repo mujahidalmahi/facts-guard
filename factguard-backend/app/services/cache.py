@@ -116,3 +116,61 @@ async def set_cached_analysis(claim_hash: str, data: dict) -> None:
         )
     except Exception as e:
         logger.warning(f"Redis set_cached_analysis failed: {str(e)}")
+
+
+async def set_job_query(job_id: str, query: str) -> None:
+    try:
+        client = _get_client()
+        if client is None:
+            return
+        await asyncio.to_thread(
+            client.setex,
+            f"factguard:query:{job_id}",
+            86400,
+            query,
+        )
+    except Exception as e:
+        logger.warning(f"Redis set_job_query failed: {str(e)}")
+
+
+async def get_job_query(job_id: str) -> str | None:
+    try:
+        client = _get_client()
+        if client is None:
+            return None
+        data = await asyncio.to_thread(
+            client.get, f"factguard:query:{job_id}"
+        )
+        return data if data else None
+    except Exception as e:
+        logger.warning(f"Redis get_job_query failed: {str(e)}")
+        return None
+
+
+async def set_job_result(job_id: str, data: dict) -> None:
+    try:
+        client = _get_client()
+        if client is None:
+            return
+        await asyncio.to_thread(
+            client.setex,
+            f"factguard:job_result:{job_id}",
+            86400,
+            json.dumps(data),
+        )
+    except Exception as e:
+        logger.warning(f"Redis set_job_result failed: {str(e)}")
+
+
+async def get_job_result(job_id: str) -> dict | None:
+    try:
+        client = _get_client()
+        if client is None:
+            return None
+        data = await asyncio.to_thread(
+            client.get, f"factguard:job_result:{job_id}"
+        )
+        return json.loads(data) if data else None
+    except Exception as e:
+        logger.warning(f"Redis get_job_result failed: {str(e)}")
+        return None
