@@ -24,7 +24,6 @@ from app.utils.constants import (
 
 from app.services.cache import (
     compute_claim_hash,
-    get_cached_analysis,
     get_job_result,
     push_claim_to_history,
     set_cached_analysis,
@@ -230,13 +229,6 @@ async def get_result(
             job_id
         )
     )
-
-    if not result:
-        result = (
-            await get_cached_analysis(
-                job_id
-            )
-        )
 
     if not result:
         db_row = (

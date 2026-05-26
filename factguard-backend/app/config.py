@@ -71,6 +71,26 @@ class Settings(
         ""
     )
 
+    BRIGHTDATA_BROWSER_ZONE: str = (
+        ""
+    )
+
+    BRIGHTDATA_WSS: str = (
+        ""
+    )
+
+    BROWSER_TIMEOUT: int = (
+        15
+    )
+
+    MAX_BROWSER_PAGES: int = (
+        1
+    )
+
+    CACHE_TTL_BROWSER: int = (
+        3600
+    )
+
     CLAUDE_API_KEY: str = (
         ""
     )
@@ -120,7 +140,7 @@ class Settings(
     )
 
     FINANCIAL_MODEL: str = (
-        "deepseek/deepseek-v4-flash:free"
+        "deepseek/deepseek-chat-v3-0324"
     )
 
     SNIPPET_MAX_CHARS: int = (

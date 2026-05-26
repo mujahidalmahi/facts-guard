@@ -1,9 +1,14 @@
+import re
 from urllib.parse import quote
 
 import httpx
 from typing import Optional
 from app.config import settings
 from app.logging_config import get_logger
+from app.services.browser_cache import (
+    get_cached_browser_extract,
+    set_cached_browser_extract,
+)
 
 logger = get_logger("brightdata")
 
@@ -11,6 +16,28 @@ BRIGHTDATA_ENDPOINT = "https://api.brightdata.com/request"
 BRIGHTDATA_CRAWL_ENDPOINT = "https://api.brightdata.com/crawl"
 BRIGHTDATA_BROWSER_ENDPOINT = "https://api.brightdata.com/browser"
 BRIGHTDATA_MCP_ENDPOINT = "https://api.brightdata.com/mcp"
+
+PAYWALL_DOMAINS = [
+    "bloomberg.com",
+    "wsj.com",
+    "ft.com",
+    "barrons.com",
+    "nytimes.com",
+    "washingtonpost.com",
+    "forbes.com",
+    "economist.com",
+    "latimes.com",
+    "foreignpolicy.com",
+]
+
+SNIPPET_SUBSTRING_INDICATORS = [
+    "sign in",
+    "subscribe",
+    "unlock",
+    "paywall",
+    "limited",
+    "premium",
+]
 
 _serp_zone: str | None = None
 _serp_zone_discovered: bool = False
@@ -57,7 +84,7 @@ async def _discover_serp_zone() -> str | None:
         return None
 
 
-async def serp_search(query: str, max_results: int = 8) -> list[dict]:
+async def serp_search(query: str, max_results: int = 8, engine: str = "google") -> list[dict]:
     api_key = _get_api_key()
     if not api_key:
         logger.warning("BRIGHTDATA_API_KEY missing")
@@ -78,15 +105,22 @@ async def serp_search(query: str, max_results: int = 8) -> list[dict]:
 
     try:
         encoded_query = quote(query)
+        if engine == "bing":
+            search_url = f"https://www.bing.com/search?q={encoded_query}&count={max_results}"
+            source_label = "brightdata_bing"
+        else:
+            search_url = f"https://www.google.com/search?q={encoded_query}&num={max_results}&hl=en&gl=us&brd_json=1"
+            source_label = "brightdata_serp"
+
         payload = {
             "zone": _serp_zone,
-            "url": f"https://www.google.com/search?q={encoded_query}&num={max_results}&hl=en&gl=us&brd_json=1",
+            "url": search_url,
             "format": "raw",
         }
         async with httpx.AsyncClient() as client:
             resp = await client.post(BRIGHTDATA_ENDPOINT, json=payload, headers=_headers(), timeout=20)
             if not resp.is_success:
-                logger.warning(f"BrightData SERP error {resp.status_code}: {resp.text[:500]}")
+                logger.warning(f"BrightData SERP ({engine}) error {resp.status_code}: {resp.text[:500]}")
             resp.raise_for_status()
             data = resp.json()
 
@@ -97,12 +131,12 @@ async def serp_search(query: str, max_results: int = 8) -> list[dict]:
                 "title": r.get("title", ""),
                 "url": r.get("link", r.get("url", "")),
                 "snippet": r.get("snippet", r.get("description", "")),
-                "source": "brightdata_serp",
+                "source": source_label,
             })
-        logger.info(f"BrightData SERP returned {len(results)} results")
+        logger.info(f"BrightData SERP ({engine}) returned {len(results)} results")
         return results
     except Exception as e:
-        logger.warning(f"BrightData SERP failed: {e}")
+        logger.warning(f"BrightData SERP ({engine}) failed: {e}")
         return []
 
 
@@ -166,28 +200,69 @@ async def unlocker_scrape(url: str) -> Optional[str]:
 
 
 async def browser_render(url: str) -> Optional[str]:
-    """Tier 3: Scraping Browser for JS-heavy pages."""
-    api_key = _get_api_key()
-    if not api_key:
+    """Scraping Browser via BrightData CDP WebSocket proxy."""
+    wss_url = settings.BRIGHTDATA_WSS
+    if not wss_url:
+        logger.warning("BRIGHTDATA_WSS not configured — skipping browser render")
         return None
     try:
-        payload = {
-            "zone": "scraping_browser",
-            "url": url,
-            "action": "navigate",
-            "wait_for": "networkidle",
-            "timeout": 15000,
-        }
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(BRIGHTDATA_BROWSER_ENDPOINT, json=payload, headers=_headers(), timeout=30)
-            resp.raise_for_status()
-            data = resp.json()
-        body = data.get("body", "")[:5000]
-        logger.info(f"Scraping Browser rendered: {url}")
-        return body
+        from playwright.async_api import async_playwright
+
+        async with async_playwright() as p:
+            logger.info(f"Connecting to BrightData CDP...")
+            browser = await p.chromium.connect_over_cdp(wss_url, timeout=settings.BROWSER_TIMEOUT * 1000 + 5000)
+            page = await browser.new_page()
+            await page.goto(url, wait_until="domcontentloaded", timeout=settings.BROWSER_TIMEOUT * 1000)
+            body_text = await page.evaluate("() => document.body.innerText")
+            await page.close()
+            await browser.close()
+
+        text = (body_text or "")[:5000]
+        logger.info(f"Scraping Browser rendered: {url} ({len(text)} chars)")
+        return text
     except Exception as e:
-        logger.warning(f"Scraping Browser failed for {url}: {e}")
+        logger.warning(f"Scraping Browser (CDP) failed for {url}: {e}")
         return None
+
+
+def should_use_browser(
+    url: str,
+    snippet: str,
+) -> bool:
+    if not snippet or len(snippet.strip()) < 100:
+        return True
+
+    snippet_lower = snippet.lower()
+    for indicator in SNIPPET_SUBSTRING_INDICATORS:
+        if indicator in snippet_lower:
+            return True
+
+    domain_match = re.search(
+        r"https?://([^/]+)",
+        url,
+    )
+    if domain_match:
+        domain = domain_match.group(1).lower()
+        for paywall_domain in PAYWALL_DOMAINS:
+            if paywall_domain in domain:
+                return True
+
+    return False
+
+
+async def browser_extract_text(
+    url: str,
+) -> str | None:
+    cached = await get_cached_browser_extract(url)
+    if cached is not None:
+        logger.info(f"Browser cache hit: {url}")
+        return cached
+
+    text = await browser_render(url)
+    if text:
+        await set_cached_browser_extract(url, text)
+
+    return text
 
 
 async def mcp_discover(query: str) -> list[dict]:

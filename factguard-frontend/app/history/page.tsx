@@ -5,10 +5,11 @@ import Link from 'next/link';
 import { Shield, Clock, ArrowRight, AlertCircle } from 'lucide-react';
 import { HistorySkeleton } from '@/components/Skeleton';
 
-const MODE_BADGE = {
+const MODE_BADGE: Record<string, { label: string; bg: string; text: string }> = {
   verify: { label: 'Verify', bg: '#e0f2fe', text: '#0369a1' },
   financial: { label: 'Financial', bg: '#f0fdf4', text: '#15803d' },
   cart: { label: 'Cart', bg: '#fef9c3', text: '#854d0e' },
+  security: { label: 'Security', bg: '#fae8ff', text: '#86198f' },
 };
 
 const API_URL =
@@ -20,7 +21,7 @@ interface HistoryItem {
   claim: string;
   status: string;
   createdAt: string;
-  mode?: 'verify' | 'financial' | 'cart';
+  mode?: 'verify' | 'financial' | 'cart' | 'security';
   display_text?: string;
 }
 
