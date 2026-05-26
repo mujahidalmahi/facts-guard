@@ -1,6 +1,5 @@
 import asyncio
 import json
-import re
 from datetime import (
     datetime,
     timezone,
@@ -456,11 +455,74 @@ async def analyze_claim(
             )
 
     logger.error(
-        "All API key retries exhausted"
+        "All Gemini API key retries exhausted"
     )
+
+    # Fallback to Groq
+    try:
+        if job_id:
+            await set_progress(
+                job_id,
+                "Falling back to Groq AI...",
+            )
+
+        from app.services.groq_service import (
+            call_groq,
+        )
+
+        raw = await call_groq(
+            VERIFY_SYSTEM_PROMPT,
+            user_prompt,
+            max_tokens=1200,
+        )
+
+        raw = (
+            raw.replace(
+                "```json", ""
+            )
+            .replace("```", "")
+            .strip()
+        )
+
+        raw = strip_scratchpad(raw)
+
+        result = json.loads(raw)
+
+        original_urls = {
+            r["url"]
+            for r in search_results
+            if r.get("url")
+        }
+        if original_urls:
+            result["sources"] = (
+                validate_source_urls(
+                    result.get(
+                        "sources", []
+                    ),
+                    original_urls,
+                )
+            )
+
+        if not _validate_response(
+            result
+        ):
+            return dict(
+                FALLBACK_RESPONSE
+            )
+
+        result["_provider"] = "groq"
+        logger.info(
+            "Claim analysis completed via Groq fallback"
+        )
+        return result
+
+    except Exception as groq_err:
+        logger.error(
+            f"Groq fallback also failed: {groq_err}"
+        )
 
     return {
         **FALLBACK_RESPONSE,
         "summary":
-            "All API keys exhausted. Please try again later.",
+            "All AI providers exhausted. Please try again later.",
     }

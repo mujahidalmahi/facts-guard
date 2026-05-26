@@ -1,6 +1,6 @@
 # FactGuard Backend
 
-This is the **server** side of FactGuard — a Python program that listens for requests, searches the web, talks to AI, and returns structured results. It's built with **FastAPI**, a modern Python web framework.
+This is the **server** side of FactGuard — a Python program that listens for requests, searches the web, talks to AI (with a 3-provider resilience chain), and returns structured results. Built with **FastAPI**.
 
 ---
 
@@ -8,13 +8,14 @@ This is the **server** side of FactGuard — a Python program that listens for r
 
 1. [Project Structure](#project-structure)
 2. [How the Backend is Organized](#how-the-backend-is-organized)
-3. [The Request Lifecycle (What happens when you click Submit)](#the-request-lifecycle)
+3. [The Request Lifecycle](#the-request-lifecycle)
 4. [Services Explained](#services-explained)
-5. [AI Prompts Explained](#ai-prompts-explained)
-6. [Setup](#setup)
-7. [API Endpoints](#api-endpoints)
-8. [Environment Variables](#environment-variables)
-9. [Testing](#testing)
+5. [Three-Provider AI Resilience Chain](#three-provider-ai-resilience-chain)
+6. [AI Prompts Explained](#ai-prompts-explained)
+7. [Setup](#setup)
+8. [API Endpoints](#api-endpoints)
+9. [Environment Variables](#environment-variables)
+10. [Testing](#testing)
 
 ---
 
@@ -27,9 +28,10 @@ factguard-backend/
 ├── .env.example            # Template — copy to .env and fill in
 ├── requirements.txt        # List of every Python package needed
 ├── Dockerfile              # Instructions for packaging in a container
+├── render.yaml             # Render deployment config
 │
 ├── scripts/
-│   └── seed_demo.py        # Pre-loads demo claims into Redis for testing
+│   └── seed_demo.py        # Pre-loads 15+ demo fixtures across 4 tracks
 │
 ├── tests/                  # Automated tests (run with: pytest)
 │   ├── conftest.py         # Test configuration
@@ -42,45 +44,51 @@ factguard-backend/
     ├── main.py             # Entry point — creates the FastAPI app,
     │                       #   registers routes, sets up CORS
     │
-    ├── config.py           # Reads .env file and makes values available
-    │                       #   as Python objects (using Pydantic Settings)
+    ├── config.py           # Reads .env file via Pydantic Settings
     │
-    ├── schemas.py          # Defines request/response data shapes
-    │                       #   (e.g., "a verify request must have a 'claim' field")
+    ├── schemas.py          # Request/response Pydantic models
     │
-    ├── exceptions.py       # Custom error types (e.g., "ClaimTooLongError")
+    ├── exceptions.py       # Custom error types
     │
-    ├── middleware.py        # Global error handling — catches crashes
-    │                       #   and returns friendly error messages
+    ├── logging_config.py   # Sets up structured logging
     │
-    ├── logging_config.py   # Sets up logging (prints to console)
+    ├── dependencies.py     # Factory functions (Gemini client, Supabase)
     │
-    ├── dependencies.py     # Factory functions that create shared services
-    │                       #   (Gemini client, Supabase client)
+    ├── middleware/         # 👈 MIDDLEWARE PACKAGE
+    │   ├── __init__.py     #   Backward-compatible exports
+    │   ├── audit.py        #   Logs every API request to audit_logs
+    │   └── ratelimit.py    #   Rate limiting (120 req/min/IP)
     │
     ├── api/                # 👈 ROUTES — the "doors" into the app
-    │   ├── verify.py       #   POST /verify — submit a claim
-    │   ├── financial.py    #   POST /financial — market query
-    │   ├── pricing.py      #   POST /cart — product price check
-    │   └── history.py      #   GET /history — past results
+    │   ├── verify.py       #   POST /verify + GET /result
+    │   ├── financial.py    #   POST /financial
+    │   ├── pricing.py      #   POST /cart
+    │   ├── threats.py      #   GET+POST /threats/scan, GET /threats/report
+    │   └── history.py      #   GET /history
     │
     ├── services/           # 👈 BUSINESS LOGIC — the "brain"
-    │   ├── gemini.py       #   Gemini AI prompt + response parsing (verify mode)
-    │   ├── deepseek.py     #   DeepSeek AI prompt + response (financial mode)
-    │   ├── cart_ai.py      #   Gemini AI prompt + response (cart mode)
-    │   ├── financial.py    #   Orchestrates full financial analysis pipeline
-    │   ├── pricing.py      #   Orchestrates full price comparison pipeline
-    │   ├── router_ai.py    #   Classifies which mode a query belongs to
-    │   ├── cache.py        #   Redis cache — fast storage for results + progress
-    │   ├── supabase_db.py  #   Supabase/Postgres — permanent storage
-    │   └── credibility.py  #   Rates how trustworthy a source is
+    │   ├── gemini.py       #   VERITAS prompt + Gemini analysis
+    │   ├── deepseek.py     #   ORACLE prompt + DeepSeek (financial)
+    │   ├── groq_service.py #   Groq llama-3.3-70b fallback (free tier)
+    │   ├── cart_ai.py      #   PRICEWATCH prompt (cart mode)
+    │   ├── financial.py    #   Orchestrates financial pipeline
+    │   ├── pricing.py      #   Orchestrates price comparison pipeline
+    │   ├── router_ai.py    #   Query classifier (Gemini → Groq)
+    │   ├── brightdata.py   #   All 6 Bright Data integrations
+    │   ├── routing.py      #   Circuit breaker + MCP Discover + fallback
+    │   ├── credibility.py  #   Composite source scoring
+    │   ├── threat_monitor.py # Threat scanning + proxy enrichment
+    │   ├── cache.py        #   Redis cache
+    │   ├── supabase_db.py  #   Supabase/Postgres persistence
+    │   └── db.py           #   Low-level DB helpers
     │
     └── utils/              # 👈 TOOLS — helper functions
-        ├── search.py       #   Web search: BrightData (primary) → DuckDuckGo (fallback)
-        ├── parsing.py      #   Extracts clean JSON from AI responses
-        ├── pricing_parser.py  # Extracts prices from search snippets
-        ├── validators.py   #   Detects malicious input (SQL injection)
-        └── constants.py    #   Shared constants (verdicts, stances, etc.)
+        ├── search.py       #   Web search routing
+        ├── duckduckgo.py   #   DuckDuckGo fallback (extracted)
+        ├── parsing.py      #   JSON extraction + URL validation
+        ├── pricing_parser.py # Merchant classification
+        ├── validators.py   #   SQL injection detection
+        └── constants.py    #   Shared constants
 ```
 
 ---
@@ -98,6 +106,7 @@ Think of the backend like a restaurant kitchen:
 | `app/config.py` | The **recipe book** | Reads settings from `.env` |
 | `app/schemas.py` | The **order forms** | Ensures orders have all required info |
 | `app/dependencies.py` | The **pantry** | Stocks shared ingredients (API clients) |
+| `app/middleware/` | The **health inspector** | Rate limits, audit logs |
 
 ---
 
@@ -111,124 +120,190 @@ Here's exactly what happens when a request arrives:
                       ▼
 2. main.py routes it to the correct handler
    ─────────────────────────────────────────
-   POST /verify  →  api/verify.py
-   POST /financial → api/financial.py
-   POST /cart    →  api/pricing.py
+   POST /verify     →  api/verify.py
+   POST /financial  →  api/financial.py
+   POST /cart       →  api/pricing.py
+   POST /threats/scan → api/threats.py
                       │
                       ▼
-3. The handler saves the request to Supabase (database)
-   and creates a background task
+3. Rate-limit check (120 req/min/IP)
+   → if exceeded, returns 429 JSONResponse
                       │
                       ▼
-4. The handler immediately returns { "jobId": "abc-123" }
-   (so the frontend doesn't hang waiting)
+4. Audit log: INSERT into audit_logs table
                       │
                       ▼
-5. BACKGROUND TASK starts running:
+5. Handler saves request to Supabase + creates background task
                       │
-                      ├── 5a. Check Redis cache
+                      ▼
+6. Handler immediately returns { "jobId": "abc-123" }
+   (frontend doesn't hang waiting)
+                      │
+                      ▼
+7. BACKGROUND TASK starts running:
+                      │
+                      ├── 7a. Check Redis cache
                       │    ── HIT? Return cached result (instant!)
                       │    ── MISS? Continue...
                       │
-                      ├── 5b. Update Redis progress: "Searching..."
+                      ├── 7b. Update Redis progress: "Searching..."
                       │
-                      ├── 5c. Call search.py → BrightData SERP API
-                      │    Returns: list of { title, url, snippet }
+                      ├── 7c. MCP Discover (Step 0 — query BrightData MCP
+                      │    for available tools)
                       │
-                      ├── 5d. Update Redis progress: "Analysing..."
+                      ├── 7d. Call search layer:
+                      │    ├── BrightData SERP API (primary)
+                      │    ├── DuckDuckGo (fallback on rate-limit)
+                      │    ├── 3-tier extraction for paywalled content:
+                      │    │   Crawl API → Web Unlocker → Scraping Browser
+                      │    └── All calls tagged with bright_data_product
                       │
-                      ├── 5e. Call AI service:
-                      │    ├── verify mode  → gemini.py (VERITAS prompt)
-                      │    ├── financial    → deepseek.py (ORACLE prompt)
-                      │    └── cart mode    → cart_ai.py (PRICEWATCH prompt)
+                      ├── 7e. Update Redis progress: "Analysing..."
                       │
-                      ├── 5f. Parse AI response (extract JSON)
+                      ├── 7f. Call AI service (3-provider chain):
+                      │    ├── Gemini 2.5 Flash (primary)
+                      │    ├── retry with next Gemini key on rate-limit
+                      │    ├── Groq llama-3.3-70b (fallback on all keys exhausted)
+                      │    └── heuristic fallback on validation failure
                       │
-                      ├── 5g. Validate response:
+                      ├── 7g. Parse AI response (extract JSON)
+                      │
+                      ├── 7h. Validate response:
                       │    ├── All required fields present?
-                      │    ├── Verdict is one of the valid values?
+                      │    ├── Verdict is valid?
                       │    ├── Confidence is valid?
-                      │    └── Source URLs are from the search results?
+                      │    └── Source URLs from actual search results?
                       │
-                      ├── 5h. Save to Supabase (permanent storage)
+                      ├── 7i. For threats: proxy-enrich brand/regulatory
+                      │    threats via Residential Proxies (body_preview)
                       │
-                      ├── 5i. Save to Redis (cache for 24 hours)
+                      ├── 7j. Save to Supabase (permanent)
                       │
-                      └── 5j. Mark job as complete in Redis
+                      ├── 7k. Save to Redis (cache for 24h)
+                      │
+                      └── 7l. Mark job as complete in Redis
 ```
 
 ---
 
 ## Services Explained
 
-### `search.py` — The Web Search Layer
+### `search.py` + `duckduckgo.py` — The Web Search Layer
 
-This file finds evidence on the internet. It has two search providers:
+FactGuard has two search providers:
 
-| Provider | Status | How it works |
-|----------|--------|-------------|
-| **BrightData** | ✅ Primary | Calls BrightData's SERP API with Bearer token auth. Returns real Google-quality results |
-| **DuckDuckGo** | 🔄 Fallback | Used when BrightData API key is missing or the API call fails |
+| Provider | Status | Location |
+|----------|--------|----------|
+| **BrightData SERP** | ✅ Primary | `brightdata.py` → `serp_search()` |
+| **DuckDuckGo** | 🔄 Fallback | `duckduckgo.py` → `search()` |
 
-**Key functions:**
-- `_brightdata_search(query, max_results)` — Calls BrightData SERP API, parses organic results
-- `brightdata_scrape_product(product_url)` — Uses BrightData Web Unlocker to scrape e-commerce pages
-- `_duckduckgo_search(query, max_results)` — DuckDuckGo fallback
-- `search_claim(claim, max_results)` — Main async function, called by all three modes
+The DuckDuckGo fallback was extracted from `search.py` into its own module to fix a circular import between `routing.py` and `search.py`.
+
+### `brightdata.py` — All 6 Bright Data Products
+
+Single file that integrates all 6 Bright Data products:
+
+| Product | Function | Circuit Breaker |
+|---------|----------|:--------------:|
+| MCP Server | `mcp_discover()` | ✅ |
+| SERP API | `serp_search()` (with zone auto-discovery) | ✅ |
+| Web Unlocker | `unlock_and_scrape()` | ✅ |
+| Crawl API | `crawl_extract()` | ✅ |
+| Scraping Browser | `browser_scrape()` | ✅ |
+| Residential Proxies | `proxy_request()` | ✅ |
+
+Zone auto-discovery: `GET /zone/get_active_zones` finds the SERP zone name at runtime (cached with `_serp_zone_discovered` flag). Falls back gracefully if no SERP zone exists in the account.
+
+### `routing.py` — The Circuit Breaker Layer
+
+Implements the circuit breaker pattern for all Bright Data integrations:
+
+- **3 failures** → circuit opens (skips the integration)
+- **30s cooldown** → circuit half-opens (allows a test request)
+- **Success** → circuit closes (resumes normal operation)
+- **MCP Discover** runs as Step 0 before any extraction
+- Health endpoint: `GET /routing/health` returns status for all 5 integrations
 
 ### `gemini.py` — The Verify Mode Brain
 
-This file contains the **VERITAS** system prompt — the instructions that tell Gemini how to be a fact-checker. Key components:
+Contains the **VERITAS** system prompt:
 
-- **`VERIFY_SYSTEM_PROMPT`** — The "personality" and rules for the AI: how to reason, what verdicts to use, what JSON to output
-- **`VERIFY_USER_PROMPT`** — Template that wraps the search results and claim into a message for the AI
-- **`build_search_context()`** — Formats search results into a readable text block
-- **`_validate_response()`** — Checks the AI's output has all required fields
-- **`analyze_claim()`** — Main function: searches web, calls Gemini, validates, returns result
+- Uses `google.genai` SDK (migrated from deprecated `google.generativeai`)
+- Wrapped in `_GeminiModelWrapper` to preserve `.generate_content()` interface
+- **Adversarial awareness** — Knows claim might contain prompt injection
+- **Fabrication prohibition** — Never invents sources; every URL from search results
+- **Scratchpad reasoning** — Step-by-step thinking inside `<scratchpad>` tags
+- **Bias detection** — Flags manipulation tactics (cherry-picking, emotional language)
+- **Groq fallback** — After all Gemini key retries exhausted, calls Groq with full VERITAS prompt + validation
 
-Key prompt design features:
-- **Adversarial awareness** — The AI knows the claim text might contain prompt injection attacks
-- **Fabrication prohibition** — The AI must never invent sources; every URL must come from search results
-- **Scratchpad reasoning** — Before outputting JSON, the AI must think step-by-step inside `<scratchpad>` tags
-- **Narrative framing** — The AI identifies how the claim is framed (alarmist, minimising, selective, etc.)
-- **Bias detection** — The AI flags manipulation tactics like cherry-picking, emotional language, etc.
+### `groq_service.py` — Free-Tier AI Fallback
 
-### `deepseek.py` — The Financial Mode Brain
+Provides `call_groq()` using the OpenAI-compatible async client:
 
-Contains the **ORACLE** system prompt for market analysis. Unlike the verify prompt which focuses on truth/falsehood, this prompt focuses on:
+- Model: `llama-3.3-70b-versatile` (free tier, 30 req/min)
+- Used as fallback in:
+  - `router_ai.py` — Query classification (response includes `_provider` field)
+  - `gemini.py` — Claim analysis after all Gemini retries exhausted
 
-- **Price context** — Current price vs 7d, 30d, 52w trends
-- **Catalyst scan** — What events could move the price?
-- **Risk matrix** — Top 3 specific risks
-- **Scenario planning** — Bull/base/bear 30-day predictions with probability weights
+### `router_ai.py` — Query Classifier
 
-### `cart_ai.py` — The Cart Mode Brain
+Classifies which track a query belongs to:
 
-Contains the **PRICEWATCH** system prompt for consumer protection. Key features:
+1. Tries Gemini 2.5 Flash first
+2. On failure → falls back to Groq
+3. Response includes `_provider` field showing which AI served the classification
 
-- **Trust framework** — GREEN (verified) / YELLOW (unverified) / RED (risky)
-- **Deal quality scoring** — Each listing gets a score from 0-100
-- **Counterfeit risk detection** — Flags listings that look fake
-- **Market price intelligence** — Determines the fair price range for any product
+### `credibility.py` — Source Trust Scoring
 
-### `cache.py` — The Redis Layer
+Composite scoring model: Domain authority (35%) + stance alignment (25%) + temporal freshness (20%) + base tier (20%). Heuristic fallback for `.gov/.edu/.mil` domains and known authoritative publishers.
 
-Redis is a fast in-memory database. This service uses it for two things:
+### `threat_monitor.py` — Threat Scanning Pipeline
 
-| Feature | How it works | Benefit |
-|---------|-------------|---------|
-| **Claim dedup** | Computes a SHA-256 hash of the claim text, stores result for 24h | Same claim twice → instant response, zero AI cost |
-| **Progress tracking** | Stores current progress message with 5-minute expiry | Frontend can show "Searching... Analysing..." in real-time |
+Scans 10+ trusted news domains, classifies into brand/regulatory/vendor/disinformation, then:
 
-### `supabase_db.py` — The Permanent Storage
+- **Brand & Regulatory threats**: Enriched via `proxy_request()` (BrightData Residential Proxies, `country="us"`) — attaches `body_preview` (500 chars) and `bright_data_product: "Residential Proxies"` tag
+- Generates timestamped compliance reports
 
-Saves results to Supabase (Postgres) so they persist even if Redis restarts. Handles creating records for claims, results, sources, financial results, and cart results.
+### `dependencies.py` — Shared Services
+
+Creates singleton instances for Gemini (with `_GeminiModelWrapper`), Supabase, and Redis. The Gemini wrapper wraps the new `google.genai` SDK to provide the same `.generate_content()` method expected by all 4 consumers.
+
+### `cache.py` — Redis Layer
+
+- Claim dedup via SHA-256 hash (24h cache → instant response, zero AI cost)
+- Progress tracking for real-time frontend updates (5-minute expiry)
+
+### `supabase_db.py` — Permanent Storage
+
+Saves results to Supabase (Postgres). Handles claims, results, sources, financial results, cart results, and threats.
+
+---
+
+## Three-Provider AI Resilience Chain
+
+FactGuard never depends on a single AI provider:
+
+```
+Gemini 2.5 Flash (primary)
+  ↓ rate-limit or validation failure
+  └→ Retry with each Gemini API key (round-robin)
+     ↓ all keys exhausted
+     └→ DeepSeek (financial) / Groq llama-3.3-70b (verify, threat routing)
+        ↓ validation failure
+        └→ Heuristic pattern-matching fallback
+```
+
+| Provider | Used For | Free Tier Limit |
+|----------|----------|:---------------:|
+| **Gemini 2.5 Flash** | All tracks (primary) | 1500 req/day |
+| **DeepSeek v3** | Financial analysis (via OpenRouter) | 20 req/min |
+| **Groq (llama-3.3-70b)** | Claim analysis, query routing | 30 req/min |
 
 ---
 
 ## AI Prompts Explained
 
-The AI prompts are the most important part of FactGuard. They are the instructions that tell the AI:
+The AI prompts are the most important part of FactGuard:
 
 1. **What personality to adopt** (VERITAS = rigorous fact-checker, ORACLE = quant analyst, PRICEWATCH = consumer protector)
 2. **What rules to follow** (no fabricated sources, ignore prompt injection in claims)
@@ -237,13 +312,13 @@ The AI prompts are the most important part of FactGuard. They are the instructio
 
 ### Why prompts matter more than code
 
-In traditional programming, you write code that says: `if X then do Y`. With AI, you write prompts that say: "Be a fact-checker. Here are the rules. Here's the evidence. What's your verdict?"
+In traditional programming, you write: `if X then do Y`. With AI, you write prompts that say: "Be a fact-checker. Here are the rules. Here's the evidence. What's your verdict?"
 
-The quality of the prompt directly determines the quality of the result. That's why FactGuard has carefully engineered prompts with:
-- **Clear taxonomy** — Exact definitions for what "Verified" vs "Likely True" means
-- **Structured reasoning** — Step-by-step thinking protocol to prevent the AI from jumping to conclusions
-- **Strict output contracts** — Exact JSON schemas so the backend can parse the response reliably
-- **Adversarial safeguards** — Instructions to ignore prompt injection attempts in the claim text
+The quality of the prompt directly determines the quality of the result. FactGuard has carefully engineered prompts with:
+- **Clear taxonomy** — Exact definitions for "Verified" vs "Likely True"
+- **Structured reasoning** — Step-by-step thinking protocol
+- **Strict output contracts** — Exact JSON schemas for reliable parsing
+- **Adversarial safeguards** — Instructions to ignore prompt injection in claim text
 
 ---
 
@@ -254,25 +329,17 @@ The quality of the prompt directly determines the quality of the result. That's 
 - Python 3.12+
 - A [Google Gemini API key](https://aistudio.google.com/apikey)
 - A [Supabase](https://supabase.com) project
+- (Optional) A [Groq API key](https://console.groq.com) for free AI fallback
 - (Optional) A [BrightData](https://brightdata.com) API key
 - (Optional) A [Redis](https://upstash.com) instance
 
 ### Installation
 
 ```bash
-# Navigate to backend
 cd factguard-backend
-
-# Create virtual environment (isolates packages from other Python projects)
 python -m venv .venv
-
-# Activate it
-# Windows:
-.venv\Scripts\activate
-# Mac/Linux:
-source .venv/bin/activate
-
-# Install dependencies
+.venv\Scripts\activate      # Windows
+source .venv/bin/activate    # Mac/Linux
 pip install -r requirements.txt
 ```
 
@@ -289,7 +356,9 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 # === REQUIRED for BrightData (needed for web search) ===
 BRIGHTDATA_API_KEY=your-brightdata-key
 
-# === OPTIONAL ===
+# === OPTIONAL (recommended) ===
+GROQ_API_KEY=your-groq-key               # Free AI fallback
+BRIGHTDATA_SERP_ZONE=your-zone-name       # SERP zone (auto-discovered if unset)
 REDIS_URL=rediss://default:password@host:port
 DEEPSEEK_API_KEYS=key1,key2
 FRONTEND_URL=http://localhost:3000
@@ -300,8 +369,9 @@ LOG_LEVEL=INFO
 
 ```bash
 # Open database/schema.sql in Supabase SQL Editor and run it
-# Or if you have psql installed:
-psql $SUPABASE_CONNECTION_STRING -f ../database/schema.sql
+# Then run:
+# - database/threats.sql (threats + audit_logs tables)
+# - database/finance_cart.sql (financial + cart tables)
 ```
 
 ### Run the Server
@@ -314,6 +384,7 @@ Your server is now live at `http://localhost:8000`.
 
 - **API docs (Swagger UI)**: `http://localhost:8000/docs`
 - **Health check**: `http://localhost:8000/health`
+- **Circuit breaker health**: `http://localhost:8000/routing/health`
 
 ---
 
@@ -355,20 +426,64 @@ curl -X POST http://localhost:8000/cart \
 
 Returns: `{ "jobId": "uuid-string" }`
 
+### GET /threats/scan (also POST)
+
+Scan news sources for potential threats.
+
+```bash
+curl http://localhost:8000/threats/scan?query=data+breach+supply+chain
+```
+
+Returns:
+```json
+{
+  "jobId": "uuid",
+  "threats": [
+    {
+      "threat_type": "vendor",
+      "severity": "high",
+      "title": "...",
+      "source_url": "https://...",
+      "confidence": 0.85,
+      "body_preview": "The breach exposed...",
+      "bright_data_product": "Residential Proxies"
+    }
+  ],
+  "count": 1
+}
+```
+
+### GET /threats/report
+
+Generate a compliance report.
+
+```bash
+curl http://localhost:8000/threats/report?query=GDPR+violation
+```
+
+Returns:
+```json
+{
+  "report": "=== FACTGUARD COMPLIANCE REPORT ===\nGenerated: ...",
+  "threats": [...],
+  "count": 1
+}
+```
+
 ### GET /result/{job_id}
 
-Poll for the result. Add `?mode=verify|financial|cart`.
+Poll for the result. Add `?mode=verify|financial|cart|security`.
 
 ```bash
 curl http://localhost:8000/result/abc-123?mode=verify
 ```
 
-Returns (while processing):
+Returns (processing):
 ```json
 { "status": "processing", "jobId": "abc-123" }
 ```
 
-Returns (when done):
+Returns (done):
 ```json
 {
   "status": "done",
@@ -390,25 +505,47 @@ curl http://localhost:8000/health
 
 Returns: `{ "status": "ok", "version": "1.0.0", "environment": "development" }`
 
+### GET /routing/health
+
+Circuit breaker status per Bright Data integration.
+
+```bash
+curl http://localhost:8000/routing/health
+```
+
+Returns:
+```json
+{
+  "mcp": { "status": "closed", "failures": 0 },
+  "serp": { "status": "closed", "failures": 1 },
+  "crawl": { "status": "closed", "failures": 0 },
+  "unlocker": { "status": "open", "failures": 3, "cooldown_remaining": 18 },
+  "browser": { "status": "half-open", "failures": 2 }
+}
+```
+
 ---
 
 ## Environment Variables
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `GEMINI_API_KEYS` | ✅ Yes | — | Comma-separated Gemini API keys (rotation on rate-limit) |
+| `GEMINI_API_KEYS` | ✅ Yes | — | Comma-separated Gemini API keys |
 | `SUPABASE_URL` | ✅ Yes | — | Supabase project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | ✅ Yes | — | Supabase service role (admin) key |
-| `BRIGHTDATA_API_KEY` | ✅ Yes* | — | BrightData API key (*required for real search) |
-| `DEEPSEEK_API_KEYS` | No | — | Comma-separated DeepSeek/OpenRouter keys |
-| `FRONTEND_URL` | No | `http://localhost:3000` | Allowed CORS origin |
+| `SUPABASE_SERVICE_ROLE_KEY` | ✅ Yes | — | Supabase service role key |
+| `BRIGHTDATA_API_KEY` | ✅ Yes* | — | BrightData API key (*for real search) |
+| `GROQ_API_KEY` | No | — | Groq API key (free fallback AI) |
+| `BRIGHTDATA_SERP_ZONE` | No | — | SERP zone name (auto-discovered) |
+| `CLAUDE_API_KEYS` | No | — | Comma-separated Claude API keys |
+| `DEEPSEEK_API_KEYS` | No | — | Comma-separated DeepSeek keys |
+| `FRONTEND_URL` | No | `http://localhost:3000` | CORS origin |
 | `REDIS_URL` | No | — | Redis connection string |
-| `GEMINI_MODEL_NAME` | No | `gemini-2.5-flash` | Gemini model identifier |
-| `DEEPSEEK_MODEL` | No | — | DeepSeek model identifier |
-| `CACHE_TTL` | No | `86400` | Cache time-to-live in seconds |
+| `GEMINI_MODEL_NAME` | No | `gemini-2.5-flash` | Gemini model |
+| `DEEPSEEK_MODEL` | No | — | DeepSeek model |
+| `CACHE_TTL` | No | `86400` | Cache TTL in seconds |
 | `SEARCH_PROVIDER` | No | `brightdata` | Default search provider |
-| `LOG_LEVEL` | No | `INFO` | Logging level (DEBUG, INFO, WARNING, ERROR) |
-| `MAX_CLAIM_LENGTH` | No | `500` | Maximum claim length in characters |
+| `LOG_LEVEL` | No | `INFO` | Logging level |
+| `MAX_CLAIM_LENGTH` | No | `500` | Max claim length in characters |
 
 ---
 

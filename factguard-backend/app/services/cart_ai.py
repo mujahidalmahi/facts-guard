@@ -62,12 +62,12 @@ Analyse these listings and return the JSON enrichment."""
 
 def format_listings_table(listings: list[dict]) -> str:
     rows = []
-    for i, l in enumerate(listings):
-        price = f"${l['price']:.2f}" if l.get('price') else 'N/A'
+    for i, listing in enumerate(listings):
+        price = f"${listing['price']:.2f}" if listing.get('price') else 'N/A'
         rows.append(
-            f"{i} | {l.get('title','')[:60]} | {price} | "
-            f"{l.get('merchant','?')} | {l.get('url','')[:50]} | "
-            f"{l.get('condition') or 'New'}"
+            f"{i} | {listing.get('title','')[:60]} | {price} | "
+            f"{listing.get('merchant','?')} | {listing.get('url','')[:50]} | "
+            f"{listing.get('condition') or 'New'}"
         )
     return '\n'.join(rows)
 

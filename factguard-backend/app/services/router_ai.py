@@ -43,6 +43,7 @@ async def classify_query(
     Classify a user query into one of the defined modes.
     Returns a dict with mode, confidence, reason, normalised_input.
     Falls back to 'unclear' on any failure.
+    Tries Gemini first, then Groq as fallback.
     """
     from app.dependencies import get_gemini_service
     import asyncio
@@ -51,60 +52,85 @@ async def classify_query(
         raw_input=raw_input,
     )
 
-    try:
-        gemini_service = get_gemini_service()
-        model = gemini_service.get_model()
+    valid_modes = {
+        "verify",
+        "financial",
+        "cart",
+        "unclear",
+        "unsafe",
+    }
 
-        response = await asyncio.wait_for(
-            asyncio.to_thread(
-                model.generate_content,
-                user_prompt,
-            ),
-            timeout=10.0,
-        )
+    for provider in ("gemini", "groq"):
+        try:
+            if provider == "gemini":
+                gemini_service = get_gemini_service()
+                model = gemini_service.get_model()
 
-        text = (
-            response.text
-            .replace("```json", "")
-            .replace("```", "")
-            .strip()
-        )
+                response = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        model.generate_content,
+                        user_prompt,
+                    ),
+                    timeout=10.0,
+                )
 
-        result = json.loads(text)
+                text = response.text
 
-        valid_modes = {
-            "verify",
-            "financial",
-            "cart",
-            "unclear",
-            "unsafe",
-        }
-        mode = result.get("mode", "unclear")
-        if mode not in valid_modes:
-            mode = "unclear"
+            else:
+                from app.services.groq_service import (
+                    call_groq,
+                )
 
-        return {
-            "mode": mode,
-            "confidence": result.get(
-                "confidence", "Low"
-            ),
-            "reason": result.get(
-                "reason",
-                "Classification failed.",
-            ),
-            "normalised_input": (
-                result.get("normalised_input")
-                or raw_input
-            ),
-        }
+                text = await call_groq(
+                    ROUTER_SYSTEM_PROMPT,
+                    user_prompt,
+                    max_tokens=200,
+                )
 
-    except Exception as e:
-        logger.warning(
-            f"Query classification failed: {e}"
-        )
-        return {
-            "mode": "unclear",
-            "confidence": "Low",
-            "reason": "Classification service unavailable.",
-            "normalised_input": raw_input,
-        }
+            text = (
+                text.replace(
+                    "```json", ""
+                )
+                .replace("```", "")
+                .strip()
+            )
+
+            result = json.loads(text)
+
+            mode = result.get(
+                "mode", "unclear"
+            )
+            if mode not in valid_modes:
+                mode = "unclear"
+
+            return {
+                "mode": mode,
+                "confidence": result.get(
+                    "confidence",
+                    "Low",
+                ),
+                "reason": result.get(
+                    "reason",
+                    "Classification failed.",
+                ),
+                "normalised_input": (
+                    result.get(
+                        "normalised_input"
+                    )
+                    or raw_input
+                ),
+                "_provider": provider,
+            }
+
+        except Exception as e:
+            logger.warning(
+                f"Router {provider} failed: {e}"
+            )
+
+    return {
+        "mode": "unclear",
+        "confidence": "Low",
+        "reason": "Classification service unavailable.",
+        "normalised_input": raw_input,
+        "_provider": "none",
+    }

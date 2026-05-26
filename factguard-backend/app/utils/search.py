@@ -2,11 +2,15 @@ import asyncio
 import os
 
 import httpx
-from ddgs import DDGS
 
 from app.logging_config import (
     get_logger,
 )
+from app.services.routing import (
+    search_with_fallback,
+    extract_article_content,
+)
+from app.utils.duckduckgo import search as _duckduckgo_search
 
 logger = get_logger(
     "search"
@@ -17,56 +21,6 @@ SEARCH_RESULTS_MAX = 8
 BRIGHTDATA_ENDPOINT = (
     "https://api.brightdata.com/request"
 )
-
-BRIGHTDATA_UNLOCKER = (
-    "https://api.brightdata.com/request"
-)
-
-
-def _duckduckgo_search(
-    query: str,
-    max_results: int,
-) -> list[dict]:
-    try:
-        results = list(
-            DDGS().text(
-                query,
-                max_results=max_results,
-            )
-        )
-
-        return [
-            {
-                "title":
-                    r.get(
-                        "title",
-                        "",
-                    ),
-
-                "url":
-                    r.get(
-                        "href",
-                        "",
-                    ),
-
-                "snippet":
-                    r.get(
-                        "body",
-                        "",
-                    ),
-
-                "source":
-                    "duckduckgo",
-            }
-            for r in results
-        ]
-
-    except Exception as e:
-        logger.warning(
-            f"DuckDuckGo search failed: {e}"
-        )
-
-        return []
 
 
 def _brightdata_search(
@@ -147,7 +101,7 @@ def _brightdata_search(
                             ),
                         ),
                     "source":
-                        "brightdata",
+                        "brightdata_serp",
                 }
             )
 
@@ -189,7 +143,7 @@ def brightdata_scrape_product(
         }
 
         resp = httpx.post(
-            BRIGHTDATA_UNLOCKER,
+            BRIGHTDATA_ENDPOINT,
             json=payload,
             headers={
                 "Authorization":
@@ -237,29 +191,20 @@ async def search_claim(
     max_results: int = SEARCH_RESULTS_MAX,
 ) -> list[dict]:
     try:
-        results = (
-            await asyncio.to_thread(
-                _search_sync,
-                claim,
-                max_results,
-            )
-        )
-
+        results = await search_with_fallback(claim, max_results)
         if results:
-            logger.info(
-                f"Web search returned "
-                f"{len(results)} results"
-            )
+            logger.info(f"Routing search returned {len(results)} results")
         else:
-            logger.info(
-                "Web search returned no results"
-            )
-
+            results = await asyncio.to_thread(_search_sync, claim, max_results)
+            if results:
+                logger.info(f"Fallback search returned {len(results)} results")
+            else:
+                logger.info("Web search returned no results")
         return results
-
     except Exception as e:
-        logger.warning(
-            f"Web search failed: {str(e)}"
-        )
-
+        logger.warning(f"Web search failed: {str(e)}")
         return []
+
+
+async def deep_extract_article(url: str) -> dict:
+    return await extract_article_content(url)

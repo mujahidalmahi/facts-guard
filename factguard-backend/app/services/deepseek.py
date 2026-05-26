@@ -152,7 +152,7 @@ async def deepseek_financial_analysis(
         timezone.utc
     ).strftime("%Y-%m-%d")
 
-    search_context_block = (
+    (
         build_search_context(
             json.loads(context)
             if isinstance(context, str)

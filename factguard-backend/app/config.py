@@ -67,6 +67,18 @@ class Settings(
         ""
     )
 
+    BRIGHTDATA_SERP_ZONE: str = (
+        ""
+    )
+
+    CLAUDE_API_KEY: str = (
+        ""
+    )
+
+    CLAUDE_API_KEYS: str = (
+        ""
+    )
+
     SUPABASE_URL: (
         Optional[str]
     ) = None

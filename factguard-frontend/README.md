@@ -1,6 +1,6 @@
 # FactGuard Frontend
 
-This is the **browser app** for FactGuard — what you see and interact with. It's built with **Next.js 16**, a popular React framework that handles routing, page rendering, and builds.
+This is the **browser app** for FactGuard — what you see and interact with. Built with **Next.js 16**, React framework that handles routing, page rendering, and builds.
 
 ---
 
@@ -29,24 +29,18 @@ factguard-frontend/
 ├── tsconfig.json                # TypeScript configuration
 ├── postcss.config.mjs           # CSS processing config
 ├── next.config.ts               # Next.js configuration
+├── vercel.json                  # Vercel deployment config
 │
 ├── public/                      # Static files (images, icons)
-│   ├── file.svg
-│   ├── globe.svg
-│   ├── next.svg
-│   ├── vercel.svg
-│   └── window.svg
 │
 ├── app/                         # 👈 PAGES (each folder = a URL)
 │   │
 │   ├── layout.tsx               # Root layout — wraps every page
-│   │                            #   Contains: fonts, Nav bar, Theme, Footer
+│   │                            #   Contains: Nav, Theme, Footer
 │   │
-│   ├── globals.css              # Global styles — Tailwind + custom CSS
-│   │                            #   (glassmorphism, gradient text, etc.)
+│   ├── globals.css              # Global styles (Tailwind + custom)
 │   │
-│   ├── page.tsx                 # HOME PAGE ("/") — the main interface
-│   │                            #   Mode switcher + text input + splash screen
+│   ├── page.tsx                 # HOME PAGE ("/") — 4-mode switcher + input
 │   │
 │   ├── loading/                 # LOADING PAGE ("/loading?job=...&mode=...")
 │   │   └── page.tsx             #   Animated spinner + progress steps
@@ -55,32 +49,38 @@ factguard-frontend/
 │   │   └── page.tsx
 │   │
 │   ├── history/                 # HISTORY PAGE ("/history")
-│   │   └── page.tsx             #   Shows past verifications from the database
+│   │   └── page.tsx             #   Past results from database
 │   │
 │   └── result/                  # RESULT PAGES ("/result/some-job-id?mode=...")
 │       └── [jobId]/             #   Dynamic route — [jobId] changes per result
-│           ├── page.tsx         #   Main result display
-│           ├── layout.tsx       #   OG image metadata (for social sharing)
+│           ├── page.tsx           # Main result display (all 4 modes)
+│           ├── layout.tsx         # OG image metadata (for social sharing)
 │           ├── FinancialResultView.tsx  # Financial mode result
-│           └── CartResultView.tsx       # Cart mode result
+│           ├── CartResultView.tsx       # Cart mode result
+│           └── ThreatResultView.tsx     # Security mode result + report download
 │
 ├── components/                  # 👈 REUSABLE UI COMPONENTS
 │   │
 │   │  # === Navigation & Layout ===
-│   ├── Nav.tsx                  # Top navigation bar with theme toggle
-│   ├── ModeSwitcher.tsx         # Toggle buttons: Verify | Financial | Cart
+│   ├── Nav.tsx                  # Top bar with Bright Data health dots
+│   │                           #   5 colored circles (MCP/SERP/Crawl/Unlock/Browser)
+│   │                           #   Polls /routing/health every 15s
+│   ├── ModeSwitcher.tsx         # 4-mode toggle: Verify | Financial | Security | Cart
 │   ├── ThemeProvider.tsx        # Dark/light mode context
 │   ├── ThemeScript.tsx          # Prevents white flash on page load
 │   │
 │   │  # === Result Display ===
-│   ├── VerdictBadge.tsx         # Animated verdict card (Verified → Unverified)
+│   ├── VerdictBadge.tsx         # Animated verdict card
 │   ├── ConfidencePill.tsx       # Confidence level (High/Medium/Low)
-│   ├── AgreementMeter.tsx       # Stacked bar chart (supports vs contradicts)
+│   ├── AgreementMeter.tsx       # Stacked bar (supports vs contradicts)
 │   ├── EvidenceTimeline.tsx     # Sorted source list with stance stripes
-│   ├── SourceGraph.tsx          # Node graph visualization of sources
+│   ├── SourceGraph.tsx          # SVG node graph of sources
 │   ├── BiasHeatmap.tsx          # Detected bias manipulation signals
 │   ├── SignalBadge.tsx          # Financial signal (Bullish/Bearish/Neutral)
 │   ├── PriceChart.tsx           # Price history line chart
+│   │
+│   │  # === Security Mode ===
+│   ├── ThreatResultView.tsx     # Threat list with severity bars + download report
 │   │
 │   │  # === Cart Mode ===
 │   ├── CartProductCard.tsx      # Product card with trust score
@@ -97,27 +97,25 @@ factguard-frontend/
 │   ├── ResultErrorBoundary.tsx
 │   │
 │   │  # === UI Primitives ===
-│   └── ui/                      # Basic building blocks
+│   └── ui/                      # Base building blocks
 │       ├── badge.tsx
 │       ├── button.tsx
 │       ├── card.tsx
 │       ├── progress.tsx
 │       └── separator.tsx
 │
-├── lib/                         # 👈 SHARED CODE (not React components)
+├── lib/                         # 👈 SHARED CODE (not React)
 │   ├── constants.ts             # Colors, verdict mappings, example data
-│   ├── utils.ts                 # Helper functions (e.g., cn() for class merging)
+│   ├── utils.ts                 # Helpers (e.g., cn() for class merging)
 │   └── useJobPolling.ts         # React hook — polls backend every 1.5s
 │
 └── types/                       # 👈 TYPE DEFINITIONS
-    └── index.ts                 # All TypeScript types/interfaces
+    └── index.ts                 # ThreatResult, TrackType, ThreatType, etc.
 ```
 
 ---
 
 ## How the Frontend is Organized
-
-Think of the frontend as a house with different rooms:
 
 | Folder | What it is |
 |--------|-----------|
@@ -128,7 +126,7 @@ Think of the frontend as a house with different rooms:
 
 ### The `app/` folder (Next.js App Router)
 
-Next.js uses **file-based routing**. The URL path matches the folder structure:
+Next.js uses **file-based routing**:
 
 | URL | Folder | What you see |
 |-----|--------|-------------|
@@ -137,7 +135,7 @@ Next.js uses **file-based routing**. The URL path matches the folder structure:
 | `/history` | `app/history/page.tsx` | History page |
 | `/result/abc-123` | `app/result/[jobId]/page.tsx` | Result for job "abc-123" |
 
-The `[jobId]` folder is a **dynamic route** — the `[brackets]` mean "any value works here." This lets a single component handle ALL results, no matter their ID.
+The `[jobId]` folder is a **dynamic route** — `[brackets]` mean "any value works here." A single component handles ALL results.
 
 ---
 
@@ -151,16 +149,15 @@ The `[jobId]` folder is a **dynamic route** — the `[brackets]` mean "any value
 │    │ On first visit → SplashScreen (welcome message)         │      │
 │    │                                                         │      │
 │    │ You see:                                                 │      │
-│    │  • Mode badge: "AI Fact Intelligence" / "Live Market    │      │
-│    │    Oracle" / "Price Trust Engine" (animates per mode)   │      │
+│    │  • ModeSwitcher: [Verify] [Financial] [Security] [Cart] │      │
+│    │  • Mode badge with rotating taglines                     │      │
 │    │  • Animated gradient headline                            │      │
-│    │  • ModeSwitcher: [Verify] [Financial] [Cart]            │      │
 │    │  • Glassmorphism textarea with character counter        │      │
 │    │  • Glowing "Analyse Claim" button                        │      │
 │    │  • Example buttons (click to auto-fill)                  │      │
 │    └─────────────────────────────────────────────────────────┘      │
 │                        │                                            │
-│                        ▼ Type a claim, click submit                │
+│                        ▼ Type a query, click submit                 │
 │                        │                                            │
 └────────────────────────┼────────────────────────────────────────────┘
                          │
@@ -169,14 +166,12 @@ The `[jobId]` folder is a **dynamic route** — the `[brackets]` mean "any value
 │ 2. LOADING PAGE (/loading?job=abc-123&mode=verify)                 │
 │                                                                     │
 │    ┌─────────────────────────────────────────────────────────┐      │
-│    │ This page polls the backend every 1.5 seconds:           │      │
+│    │ Polls backend every 1.5 seconds:                         │      │
 │    │   GET /result/abc-123?mode=verify                       │      │
 │    │                                                         │      │
 │    │ You see:                                                 │      │
 │    │  • Spinning indigo loading indicator                    │      │
-│    │  • Current progress message with icon                    │      │
-│    │  • Progress bar (fills up as steps complete)             │      │
-│    │  • Step-by-step checklist with pulse-ring dots:          │      │
+│    │  • Progress bar with step-by-step checklist:             │      │
 │    │       ● Checking cache...                                │      │
 │    │       ● Searching via Bright Data...                     │      │
 │    │       ● Analysing with AI...                             │      │
@@ -192,38 +187,43 @@ The `[jobId]` folder is a **dynamic route** — the `[brackets]` mean "any value
 │ 3. RESULT PAGE (/result/abc-123?mode=verify)                       │
 │                                                                     │
 │    ┌─────────────────────────────────────────────────────────┐      │
-│    │ Displays the verdict, evidence, and analysis             │      │
+│    │ Displays the verdict/analysis based on mode:            │      │
 │    │                                                         │      │
 │    │ For VERIFY mode:                                         │      │
-│    │  • The original claim in a card                         │      │
-│    │  • Animated verdict badge with glow + icon              │      │
+│    │  • Original claim card                                   │      │
+│    │  • Animated verdict badge with glow + icon               │      │
 │    │  • Confidence pill + source diversity badge              │      │
-│    │  • Narrative frame (italic blockquote)                   │      │
-│    │  • Summary explanation                                   │      │
+│    │  • Narrative frame + summary                             │      │
 │    │  • Agreement meter (supports vs contradicts bar)        │      │
 │    │  • Bias heatmap (if biases detected)                    │      │
-│    │  • Source list/network toggle                            │      │
-│    │    [List View] [Graph View]                              │      │
-│    │    Graph View shows nodes as colored circles             │      │
+│    │  • Source list/network toggle [List] [Graph]            │      │
+│    │    Graph: nodes as colored circles                       │      │
 │    │    (green=support, red=contradict, gray=neutral)        │      │
 │    │  • Share + download buttons                              │      │
 │    │                                                         │      │
 │    │ For FINANCIAL mode:                                      │      │
 │    │  • Signal badge (Bullish/Bearish/Neutral)               │      │
-│    │  • Signal strength gauge (0-100 circular arc)           │      │
+│    │  • Signal strength gauge (0-100 arc)                    │      │
 │    │  • Price trend + risk level + freshness dot              │      │
-│    │  • Price chart (from yFinance data)                     │      │
+│    │  • Price chart (from yFinance)                          │      │
 │    │  • Key factors + risk catalysts                         │      │
-│    │  • 30-day prediction (3-column card: bull/base/bear)    │      │
+│    │  • 30-day prediction (bull/base/bear columns)           │      │
 │    │  • Market sources                                        │      │
+│    │                                                         │      │
+│    │ For SECURITY mode:                                       │      │
+│    │  • Threat count summary                                  │      │
+│    │  • Per-threat cards with severity bar + type badge       │      │
+│    │  • Confidence percentage for each threat                 │      │
+│    │  • Source links to original articles                     │      │
+│    │  • Download Report button (.txt compliance report)      │      │
 │    │                                                         │      │
 │    │ For CART mode:                                           │      │
 │    │  • Product name + fair market range                     │      │
 │    │  • Best deal card (star-highlighted)                    │      │
 │    │  • Recommendation + price trend + best time to buy      │      │
 │    │  • Warnings (red alert boxes)                           │      │
-│    │  • Product grid with trust-level color coding:          │      │
-│    │      GREEN = trusted, YELLOW = unverified, RED = risky  │      │
+│    │  • Product grid: GREEN=trusted, YELLOW=unverified,      │      │
+│    │    RED=risky                                            │      │
 │    └─────────────────────────────────────────────────────────┘      │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -233,49 +233,41 @@ The `[jobId]` folder is a **dynamic route** — the `[brackets]` mean "any value
 ## Components Explained
 
 ### VerdictBadge.tsx
-The big animated card that shows the verdict. Each verdict has its own:
-- **Color** — emerald (Verified), indigo (Likely True), amber (Mixed), red (Misleading), slate (Unverified)
-- **Glow effect** — a colored shadow that makes the card "glow"
-- **Icon** — checkmark (✓), diamond (◆), X (✗), question mark (?)
-- **Spring animation** — bounces in when the page loads
+The big animated card that shows the verdict. Each verdict has its own color, glow effect, icon, and spring animation.
 
 ### BiasHeatmap.tsx
-Shows detected manipulation tactics as colored chips. Each chip has:
-- The tactic name (e.g., "cherry picking")
-- A "Signal Detected" badge
-- A tooltip explaining what that tactic means
-- Hidden entirely (shows "No signals detected") when array is empty
+Detected manipulation tactics as colored chips with tooltips. Hidden entirely when no signals detected.
 
 ### SourceGraph.tsx
-A visual network of sources drawn with SVG (Scalable Vector Graphics):
-- **Nodes** = sources, positioned in a circle
-- **Color** = stance (green=supports, red=contradicts, gray=neutral)
-- **Size** = credibility tier (bigger = more authoritative)
-- **Glow** = subtle color halo around each node
-- Toggle between List View and Graph View
+SVG network of sources: nodes = sources (colored by stance, sized by credibility tier), toggle between List View and Graph View.
 
 ### AgreementMeter.tsx
-A stacked horizontal bar chart:
-- Green section = supporting sources
-- Gray section = neutral sources
-- Red section = contradicting sources
-- Below: numerical breakdown with bold counts
+Stacked horizontal bar: green (supports), gray (neutral), red (contradicts), with numerical breakdown.
 
 ### EvidenceTimeline.tsx
-A vertical list of sources sorted by:
-1. **Tier** (1 = government/academic first, 4 = blogs last)
-2. **Relevance** (most relevant first within each tier)
-Each source shows: colored stance stripe, title, author, date, tier badge, summary, and a quote.
+Vertical list of sources sorted by tier (government/academic first) then relevance. Shows colored stance stripe, title, author, date, tier badge, summary, and quote.
+
+### ThreatResultView.tsx
+Security track result display:
+- Threat count with "no threats detected" emerald card when empty
+- Per-threat motion cards with severity color (red/orange/amber/yellow)
+- Type badge (Brand Threat, Regulatory Change, Vendor Risk, Disinformation Campaign)
+- Confidence percentage + severity progress bar
+- Source link to original article
+- **Download Report** button: generates `.txt` compliance report from in-memory threats data
 
 ### CartProductCard.tsx
-Displays a single product listing with:
-- Merchant name + trust badge (ShieldCheck = GREEN, AlertCircle = YELLOW, AlertTriangle = RED)
-- Product title
-- Price (large, bold)
-- Counterfeit risk level + condition + stock status
-- Deal score (0-100)
-- Trust reason explanation
-- "Shop on..." link
+Product listing with merchant name, trust badge (ShieldCheck/AlertCircle/AlertTriangle), price, counterfeit risk, deal score (0-100), and trust reason.
+
+### Nav.tsx
+Top navigation bar with:
+- Theme toggle (dark/light)
+- Bright Data circuit-breaker health dots — 5 colored circles (MCP/SERP/Crawl/Unlock/Browser)
+- Polls `GET /routing/health` every 15 seconds
+- Green = circuit closed (healthy), Red = circuit open (down)
+
+### ModeSwitcher.tsx
+4-mode toggle: **Verify** · **Financial** · **Security** · **Cart**. Each mode changes the input placeholder, example buttons, and mode badge tagline.
 
 ---
 
@@ -302,12 +294,7 @@ Displays a single product listing with:
    │  useJobPolling() hook runs:
    │  every 1.5s → GET /result/{jobId}?mode=verify
    │
-   │  The hook returns:
-   │  • progress (e.g., "Searching via Bright Data...")
-   │  • icon (emoji for current mode)
-   │
-   │  Loading page shows progress steps with pulse-ring dots
-   │  Progress bar fills (25% → 50% → 75% → 100%)
+   │  Returns progress + icon → shows steps with pulse-ring dots
    │
    ▼
 5. Status = "done" → navigate to result page
@@ -317,20 +304,22 @@ Displays a single product listing with:
 6. RESULT PAGE (result/[jobId]/page.tsx)
    │
    │  Fetches result data one more time
-   │  Renders the appropriate view based on mode:
-   │  • verify → default view (VerdictBadge, AgreementMeter, etc.)
+   │  Renders appropriate view based on mode:
+   │  • verify → VerdictBadge, AgreementMeter, etc.
    │  • financial → FinancialResultView
+   │  • security → ThreatResultView
    │  • cart → CartResultView
    │
    ▼
 7. User can share or download the result
    │  ShareCard → copies link to clipboard
    │  Download → saves JSON file
+   │  Security: Download Report → saves .txt compliance report
 ```
 
 ### Key Concept: Polling vs Waiting
 
-The frontend uses **polling** (asking repeatedly) instead of **waiting** (holding the connection open). This is because AI analysis takes 15-30 seconds, and keeping an HTTP connection open that long is unreliable.
+The frontend uses **polling** (asking repeatedly) instead of **waiting** (holding the connection open). AI analysis takes 15-30 seconds, and keeping an HTTP connection open that long is unreliable.
 
 Think of it like checking if food is ready at a restaurant:
 - **Polling**: "Is my order ready?" → "Not yet" → wait 1.5s → "Is my order ready?" → "Yes!"
@@ -352,8 +341,6 @@ cd factguard-frontend
 pnpm install
 ```
 
-This reads `package.json` and downloads all required packages into `node_modules/`.
-
 ### Step 2: Configure Environment
 
 Create `.env.local` in the `factguard-frontend/` folder:
@@ -361,8 +348,6 @@ Create `.env.local` in the `factguard-frontend/` folder:
 ```
 NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
-
-This tells the frontend where the backend server is running.
 
 ### Step 3: Start the Backend
 
@@ -387,9 +372,9 @@ Your browser app is now at **http://localhost:3000**.
 
 | Route | File | What it does |
 |-------|------|-------------|
-| `/` | `app/page.tsx` | Home — mode switcher, input, splash screen |
+| `/` | `app/page.tsx` | Home — 4-mode switcher, input, splash screen |
 | `/loading?job=X&mode=Y` | `app/loading/page.tsx` | Polling with progress steps |
-| `/result/:jobId` | `app/result/[jobId]/page.tsx` | Result display for all modes |
+| `/result/:jobId` | `app/result/[jobId]/page.tsx` | Result display for all 4 modes |
 | `/history` | `app/history/page.tsx` | Past verifications list |
 
 ---
@@ -440,9 +425,4 @@ FactGuard uses a **dark space theme** with deep navy/indigo colors:
 
 ### Verdict Colors
 
-Each verdict in `VERDICT_STYLES` (inside `VerdictBadge.tsx`) has:
-- A `glow` color for the shadow
-- A gradient `bg` background
-- A `border` color
-- An `icon` (checkmark, diamond, X, question mark)
-- A `text` color
+Each verdict in `VERDICT_STYLES` has a `glow` color, gradient `bg`, `border`, `icon`, and `text` color.

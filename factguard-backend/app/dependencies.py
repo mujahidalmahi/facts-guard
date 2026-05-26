@@ -1,7 +1,7 @@
 from functools import lru_cache
 import threading
 
-import google.generativeai as genai
+from google import genai
 from supabase import create_client
 
 from app.config import settings
@@ -13,6 +13,20 @@ from app.exceptions import (
 from app.logging_config import get_logger
 
 logger = get_logger("dependencies")
+
+
+class _GeminiModelWrapper:
+    """Thin wrapper mimicking old GenerativeModel interface."""
+
+    def __init__(self, client, model_name):
+        self._client = client
+        self._model_name = model_name
+
+    def generate_content(self, contents):
+        return self._client.models.generate_content(
+            model=self._model_name,
+            contents=contents,
+        )
 
 
 class GeminiService:
@@ -29,6 +43,7 @@ class GeminiService:
         self.api_keys = api_keys
         self.model_name = model_name
         self._current_key_index = 0
+        self._client = None
         self._model = None
 
         # Thread safety fix (Bug #5)
@@ -42,13 +57,14 @@ class GeminiService:
                 self._current_key_index
             ]
 
-            genai.configure(
+            self._client = genai.Client(
                 api_key=key
             )
 
             self._model = (
-                genai.GenerativeModel(
-                    self.model_name
+                _GeminiModelWrapper(
+                    self._client,
+                    self.model_name,
                 )
             )
 
@@ -83,13 +99,16 @@ class GeminiService:
                     self.get_next_key()
                 )
 
-                genai.configure(
-                    api_key=key
+                self._client = (
+                    genai.Client(
+                        api_key=key
+                    )
                 )
 
                 self._model = (
-                    genai.GenerativeModel(
-                        self.model_name
+                    _GeminiModelWrapper(
+                        self._client,
+                        self.model_name,
                     )
                 )
 

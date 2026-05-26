@@ -125,11 +125,11 @@ export function PriceChart({
         </div>
       </div>
 
-      <div className='h-52 w-full'>
+      <div className='h-52 w-full min-w-0'>
         {mounted && (
           <ResponsiveContainer
             width='100%'
-            height='100%'
+            height={208}
           >
             <LineChart
               data={data.data}

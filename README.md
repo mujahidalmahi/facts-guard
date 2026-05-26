@@ -1,188 +1,276 @@
-# FactGuard — AI-Powered Truth Engine
+# FactGuard — Enterprise Intelligence Platform
 
-FactGuard is a **three-mode AI platform** that helps you figure out what's true online. Think of it as a personal fact-checker that reads the internet for you:
+FactGuard is a **multi-track AI platform** that verifies claims, analyzes markets, monitors threats, and compares prices — powered by the full Bright Data ecosystem and a three-provider free AI resilience chain: **Gemini → DeepSeek → Groq + heuristic fallback**.
 
-- **Verify Mode** — Paste a claim (like "The Earth is flat") and get a verdict backed by real web sources
-- **Financial Mode** — Ask about a stock or market (like "Is Tesla overvalued?") and get an AI analyst brief
-- **Cart Mode** — Search for a product (like "iPhone 16 Pro") and get trust-scored price comparisons
+- **Verify Track (GTM Intelligence)** — Fact-check competitor claims, pricing intel, hiring signals
+- **Financial Track (Finance & Risk)** — Verify earnings claims, M&A rumors, compliance alerts
+- **Security Track (Security & Compliance)** — Monitor brand threats (with proxy enrichment), regulatory changes, data breaches
+- **Cart Track** — Trust-scored price comparisons across retailers
 
-Every answer comes with **live web evidence**, **source citations**, and a **confidence score** — so you can see exactly why FactGuard reached its conclusion.
+Every answer comes with **live web evidence**, **source citations**, and **probabilistic credibility scoring**.
 
 ---
 
 ## Table of Contents
 
-1. [How It Works (For Beginners)](#how-it-works-for-beginners)
-2. [Architecture Overview](#architecture-overview)
-3. [The Three Modes Explained](#the-three-modes-explained)
-4. [Tech Stack](#tech-stack)
-5. [Project Structure](#project-structure)
-6. [Setup Guide](#setup-guide)
-7. [API Documentation](#api-documentation)
-8. [Data Flow (How a Claim Becomes a Verdict)](#data-flow)
-9. [Environment Variables](#environment-variables)
-10. [Key Design Decisions](#key-design-decisions)
-
----
-
-## How It Works (For Beginners)
-
-Imagine you hear a rumour and want to know if it's true. You'd normally:
-1. Search Google
-2. Read a few articles
-3. Decide which sources are trustworthy
-4. Make a judgement
-
-FactGuard does all four steps **automatically** in under 60 seconds:
-
-```
-You type a claim          ──►  FactGuard searches the web
-                                   (via BrightData API)
-                                     │
-                                     ▼
-                            AI reads the search results
-                                   (Gemini 2.5 Flash)
-                                     │
-                                     ▼
-                            AI produces a structured verdict:
-                            "Verified" / "Likely True" / etc.
-                            + confidence score
-                            + list of sources with quotes
-                            + bias detection
-```
+1. [Architecture Overview](#architecture-overview)
+2. [Four Tracks Explained](#four-tracks-explained)
+3. [Bright Data Integration (6 Products)](#bright-data-integration-6-products)
+4. [Intelligent Routing Layer](#intelligent-routing-layer)
+5. [Three-Provider AI Resilience Chain](#three-provider-ai-resilience-chain)
+6. [Advanced Credibility Engine](#advanced-credibility-engine)
+7. [Threat Monitoring Pipeline](#threat-monitoring-pipeline)
+8. [Tech Stack](#tech-stack)
+9. [Project Structure](#project-structure)
+10. [Setup Guide](#setup-guide)
+11. [API Documentation](#api-documentation)
+12. [Environment Variables](#environment-variables)
 
 ---
 
 ## Architecture Overview
 
-FactGuard follows a standard **client-server architecture**:
-
 ```
-┌─────────────────────────────────────────────────────────┐
-│                   BROWSER (Frontend)                     │
-│                                                         │
-│  Next.js 16 · React 19 · TypeScript · Tailwind v4       │
-│  Framer Motion (animations) · Lucide (icons)            │
-│                                                         │
-│  Pages: Splash → Input → Loading → Result               │
-└──────────────────────┬──────────────────────────────────┘
-                       │ HTTP (REST API)
-                       ▼
-┌─────────────────────────────────────────────────────────┐
-│                   SERVER (Backend)                       │
-│                                                         │
-│  Python 3.12 · FastAPI · Uvicorn                        │
-│                                                         │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐              │
-│  │ /verify  │  │/financial│  │  /cart   │  ← API routes │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘              │
-│       │              │             │                     │
-│       ▼              ▼             ▼                     │
-│  ┌─────────────────────────────────────┐                │
-│  │       AI Analysis Engines           │                │
-│  │  Gemini 2.5 Flash (primary)         │                │
-│  │  DeepSeek (financial fallback)      │                │
-│  └──────────────┬──────────────────────┘                │
-│                 │                                       │
-│                 ▼                                       │
-│  ┌─────────────────────────────────────┐                │
-│  │        Web Search Layer             │                │
-│  │  BrightData SERP API (primary)      │                │
-│  │  DuckDuckGo (fallback)              │                │
-│  └──────────────┬──────────────────────┘                │
-│                 │                                       │
-│                 ▼                                       │
-│  ┌─────────────────────────────────────┐                │
-│  │     Persistence & Cache             │                │
-│  │  Supabase (Postgres) — permanent    │                │
-│  │  Redis (Upstash) — cache + progress │                │
-│  └─────────────────────────────────────┘                │
-└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                        FRONTEND (Next.js 16)                        │
+│  ModeSwitcher: Verify · Financial · Security · Cart                  │
+│  Nav: Bright Data circuit-breaker health dots (5 colored circles)    │
+│  Components: VerdictBadge · ConfidencePill · AgreementMeter ·       │
+│              EvidenceTimeline · SourceGraph · ThreatResultView       │
+│              CartProductCard · PriceComparisonTable                  │
+└──────────────────────────┬──────────────────────────────────────────┘
+                           │ HTTP (REST)
+                           ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                     API GATEWAY (FastAPI)                            │
+│  /verify · /financial · /threats/scan · /cart · /history           │
+│  /health · /routing/health                                          │
+│  Middleware: RateLimit (120 req/min) · AuditLog · CORS              │
+└──────────┬──────────┬──────────┬──────────┬─────────────────────────┘
+           │          │          │          │
+           ▼          ▼          ▼          ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                    ROUTING LAYER (Circuit Breaker)                    │
+│                                                                      │
+│  Step 0: BrightData MCP Discover (tool orchestration)                │
+│  SERP Search:    BrightData SERP ──fallback──► DuckDuckGo (free)     │
+│  Content Extract: Crawl API ──► Web Unlocker ──► Scraping Browser    │
+│                                                                      │
+│  Each integration has its own circuit breaker (3 failures → open     │
+│  → 30s cooldown → auto-reset). Health: /routing/health              │
+└─────────────────────────────────────────────────────────────────────┘
+           │          │          │          │
+           ▼          ▼          ▼          ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│               AI ANALYSIS ENGINES (3-Provider Chain)                  │
+│  Gemini 2.5 Flash (primary — all tracks)                             │
+│    ↓ on rate-limit / validation failure                              │
+│  DeepSeek (financial fallback via OpenRouter)                        │
+│    ↓ on validation failure                                           │
+│  Groq (llama-3.3-70b, free tier — claim analysis + query routing)   │
+│    ↓                                                               │
+│  Heuristic fallback (pattern-matching when all AI providers fail)    │
+└─────────────────────────────────────────────────────────────────────┘
+           │
+           ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                    PERSISTENCE & CACHE                                │
+│  Supabase (Postgres): claims · results · sources · threats ·         │
+│                       audit_logs · financial_results · cart_results   │
+│  Redis (Upstash):     claim cache (24h) · progress tracking ·        │
+│                       rate-limit counters · history                   │
+└─────────────────────────────────────────────────────────────────────┘
 ```
-
-### What each piece does:
-
-| Layer | Job |
-|-------|-----|
-| **Frontend** | What you see in your browser. Handles user input, shows loading animations, displays results |
-| **API Routes** | The backend's "doors" — each mode has its own door (`/verify`, `/financial`, `/cart`) |
-| **AI Engines** | The "brain" — reads search results and makes judgements. Gemini is the main brain, DeepSeek is a backup |
-| **Web Search** | The "eyes" — reads the live internet to find evidence. BrightData is the primary source, DuckDuckGo is a backup |
-| **Database/Cache** | The "memory" — stores results permanently (Supabase) and keeps a fast temporary cache (Redis) |
 
 ---
 
-## The Three Modes Explained
+## Four Tracks Explained
 
-### 1. Verify Mode (Misinformation Detection)
+### 1. Verify Track (GTM Intelligence)
 
-**Use when:** You see a suspicious headline, social media post, or claim.
-
-**What happens:**
-1. Your claim is sent to the backend
-2. BrightData searches Google for relevant articles
-3. Gemini reads the search results and produces:
-   - A **verdict** (Verified → Likely Misleading → Unverified)
-   - A **confidence level** (High / Medium / Low)
-   - A **narrative frame** (e.g. "Uses alarmist language to imply urgency")
-   - **Bias signals** detected in the claim (e.g. cherry_picking, emotional_language)
-   - A **source diversity** score (High / Medium / Low)
-
-**What makes it special:** Unlike ChatGPT which makes up answers, FactGuard cites real URLs and quotes from live search results. If a source doesn't exist in the search results, it won't invent it.
-
-### 2. Financial Mode (Market Intelligence)
-
-**Use when:** You want to know if a stock is a buy/sell, or understand a market trend.
+**Use when:** You hear a competitor claim, see a suspicious headline, or need to verify market intelligence.
 
 **What happens:**
-1. Your query goes to the backend
-2. BrightData searches for news + yFinance fetches price charts
-3. DeepSeek (or Gemini) analyzes everything and returns:
-   - A **signal** (Bullish / Bearish / Neutral)
-   - A **signal strength** (0-100)
-   - A **30-day prediction** with three scenarios (bull / base / bear)
-   - **Risk catalysts** — specific risks to watch
-   - **Data freshness** indicator
+1. Claim submitted → MCP Discover runs as Step 0 (tool orchestration discovery)
+2. Source discovery via BrightData SERP API (falls back to DuckDuckGo)
+3. Gemini analyzes with 5-step VERITAS reasoning protocol
+4. On Gemini failure → retries with next API key → falls back to Groq llama-3.3-70b
+5. Returns: verdict, confidence, narrative frame, bias signals, source diversity, evidence timeline
 
-### 3. Cart Mode (Price Comparison)
+**Demo scenario:** *"Our competitor just raised Series C at $100M valuation."* → FactGuard verifies via Crunchbase, LinkedIn, press releases with credibility scoring.
 
-**Use when:** You're shopping and want to know the best deal without getting scammed.
+### 2. Financial Track (Finance & Risk)
+
+**Use when:** You want to verify earnings claims, M&A rumors, or analyze market trends.
 
 **What happens:**
-1. You type a product name
-2. BrightData searches major retailers
-3. Gemini analyzes each listing with a **trust framework**:
-   - **GREEN** — Verified retailer, fair price, in stock
-   - **YELLOW** — Unverified seller, or price is 10-30% off
-   - **RED** — Too cheap (>30% below MSRP = counterfeit risk), unknown seller
-4. Returns: the best deal, trust assessment per listing, counterfeit risk, and a recommendation
+1. Query submitted → BrightData SERP searches news + yFinance fetches charts
+2. 3-tier content extraction for paywalled analyst reports (Crawl → Unlocker → Browser)
+3. All services tagged with `bright_data_product` field (e.g. `"Web Unlocker"`, `"Crawl API"`)
+4. DeepSeek/Gemini returns: signal, 30-day prediction, risk catalysts
+
+**Demo scenario:** *"A major cloud provider is entering at 40% cheaper."* → Cross-references pricing blog posts, analyst reports, earnings calls via Web Unlocker.
+
+### 3. Security Track (Security & Compliance)
+
+**Use when:** You need to monitor brand threats, regulatory changes, vendor risks, or disinformation campaigns.
+
+**What happens:**
+1. Scan triggered → BrightData SERP searches across 10+ trusted news domains
+2. Keyword-based classification into: brand / regulatory / vendor / disinformation
+3. Brand & regulatory threats get proxy enrichment: `proxy_request()` via BrightData Residential Proxies (`country="us"`), adding `body_preview` (500 chars) and `bright_data_product: "Residential Proxies"`
+4. Severity scoring (low → critical) with confidence percentage
+5. Threat list returned with source URLs, descriptions, severity bars
+6. Compliance report generated — downloadable via **Download Report** button (`.txt`)
+
+**Demo scenario:** *"A data breach affecting a key vendor has been reported."* → Crawls vendor security pages, checks regulatory databases via Residential Proxies, generates compliance alert.
+
+**API endpoints:** `GET /threats/scan?query=...` · `GET /threats/report`
+
+### 4. Cart Track (Price Comparison)
+
+**Use when:** You're shopping and want the best deal with trust scoring.
+
+**What happens:**
+1. Product search → BrightData SERP scrapes major retailers
+2. Web Unlocker bypasses paywalled/locked listing pages (tagged `bright_data_product: "Web Unlocker"`)
+3. Gemini scores each listing with trust framework (GREEN/YELLOW/RED)
+4. Returns: best deal, counterfeit risk, market average, recommendation
+
+---
+
+## Bright Data Integration (6 Products)
+
+All 6 Bright Data products are integrated and demonstrably used in the demo. Every API call is tagged with the source product name:
+
+| Product | Purpose | FactGuard Role | Circuit Breaker |
+|---------|---------|----------------|:---:|
+| **MCP Server** | 30 AI-native tools | Step 0 — Discover available tools before extraction | ✅ |
+| **SERP API** | Real-time search results, organic rankings | Source discovery — find trusted coverage of claims | ✅ |
+| **Web Unlocker** | Bypass bot detection, CAPTCHAs, JS rendering, paywalls | Access premium sources (NYT, WSJ, FT paywalls) | ✅ |
+| **Crawl API** | Structured data extraction, metadata, sitemaps | Extract article structure, author, publish date, corrections | ✅ |
+| **Scraping Browser** | Full browser automation for JS-heavy pages | Fallback for dynamic content; click & verify buttons | ✅ |
+| **Residential Proxies** | 150M+ residential IPs, 195 countries, geo-targeting | Threat enrichment — proxy-enrich brand/regulatory threats | ✅ |
+
+All integrations live in `app/services/brightdata.py`. Each has its own circuit breaker in `app/services/routing.py`.
+
+---
+
+## Intelligent Routing Layer
+
+The routing layer implements a **circuit breaker pattern** with tiered fallbacks:
+
+### MCP Discover — Step 0
+
+Before any extraction, `mcp_discover()` queries the BrightData MCP Server for available tools. All discovered operations carry the tag `bright_data_product: "MCP Server — Discover"`.
+
+### Content Extraction Pipeline — Three-Tier Fallback
+
+| Tier | Method | Condition |
+|:----:|--------|-----------|
+| 1 | BrightData Crawl API (structured extraction) | Success — full metadata, title, author, date |
+| 2 | Web Unlocker + scrape | Crawl API rate-limited or timeout |
+| 3 | Scraping Browser (JS rendering) | JS-heavy pages; fallback from tiers 1 & 2 |
+
+### Source Discovery — Dual SERP Strategy
+
+| Source | Priority |
+|--------|:--------:|
+| BrightData SERP | Primary — real-time Google rankings (zone auto-discovered) |
+| DuckDuckGo (free) | Fallback if BrightData rate-limited |
+
+### Circuit Breaker Behaviour
+- Each integration tracks failures independently
+- 3 failures → circuit **opens** (skips that tier)
+- 30-second cooldown → circuit **half-opens** (allows test request)
+- Success → circuit **closes** (normal operation resumes)
+- Monitor at `GET /routing/health` — frontend Nav shows green/red dots for each product
+
+---
+
+## Three-Provider AI Resilience Chain
+
+FactGuard never depends on a single AI provider. Every analysis request follows this chain:
+
+```
+Gemini 2.5 Flash (primary)
+  ↓ rate-limit or validation failure
+  └→ Retry with each Gemini API key (round-robin)
+     ↓ all keys exhausted
+     └→ DeepSeek (financial) or Groq (verify/threat routing)
+        ↓ validation failure
+        └→ Heuristic pattern-matching fallback
+```
+
+| Provider | Used For | Free Tier Limit |
+|----------|----------|:---------------:|
+| **Gemini 2.5 Flash** | All tracks (primary) | 1500 req/day (free) |
+| **DeepSeek v3** | Financial analysis (via OpenRouter) | 20 req/min (free) |
+| **Groq (llama-3.3-70b)** | Claim analysis, query routing | 30 req/min (free) |
+
+The Groq service (`app/services/groq_service.py`) provides `call_groq()` using an OpenAI-compatible async client with `llama-3.3-70b-versatile`. It serves as fallback in:
+- `router_ai.py` — Query classification (Gemini → Groq, response includes `_provider` field)
+- `gemini.py` — Claim analysis via VERITAS prompt after all Gemini key retries exhausted
+
+---
+
+## Advanced Credibility Engine
+
+`app/services/credibility.py` uses a **composite scoring model**:
+
+| Factor | Weight | Source |
+|--------|:-----:|--------|
+| Domain Authority | 35% | BrightData domain audit + static heuristic (.gov→1.0, blogs→0.2) |
+| Stance Alignment | 25% | Gemini/Groq sentiment analysis |
+| Temporal Freshness | 20% | publish_date metadata (recent = higher) |
+| Base Tier | 20% | Gemini credibility tier (High/Medium/Low) |
+
+**Heuristic fallback:** `.gov/.edu/.mil` → High · Reuters/BBC/NYT → High · Blogspot/Reddit → Low
+
+---
+
+## Threat Monitoring Pipeline
+
+`app/services/threat_monitor.py` scans news sources for:
+
+| Category | Keywords Monitored | Proxy Enrichment |
+|----------|-------------------|:----------------:|
+| **Brand Threat** | breach, vulnerability, ransomware, data leak, recall, lawsuit | ✅ Residential Proxies |
+| **Regulatory** | compliance, fine, SEC, GDPR, CCPA, sanctions | ✅ Residential Proxies |
+| **Vendor Risk** | insolvency, bankruptcy, layoff, credit downgrade | ❌ |
+| **Disinformation** | misinformation, deepfake, coordinated, bot network | ❌ |
+
+Brand and regulatory threats are automatically enriched by fetching the source article body via BrightData Residential Proxies (`proxy_request(country="us")`) and attaching a `body_preview` (first 500 chars) with the `bright_data_product: "Residential Proxies"` tag.
+
+Output: Threat objects with `severity` (low/medium/high/critical), `confidence` (0-1), and `alert_status`.
 
 ---
 
 ## Tech Stack
 
 ### Backend
-| Technology | Why it's used |
-|------------|---------------|
+| Technology | Why |
+|------------|-----|
 | **Python 3.12** | Easy to read, huge AI/ML library ecosystem |
 | **FastAPI 0.115** | Modern Python web framework — fast, automatic API docs |
-| **Uvicorn** | Python server that handles many users at once |
+| **Uvicorn** | Python server that handles many concurrent users |
 | **Google Gemini 2.5 Flash** | Primary AI — fast, cheap, great at reasoning |
 | **DeepSeek (via OpenRouter)** | Backup AI for financial analysis |
-| **BrightData SERP API** | Real Google search results (this is a BrightData hackathon!) |
+| **Groq (llama-3.3-70b)** | Free-tier fallback for claim analysis + query routing |
+| **BrightData (6 products)** | MCP · SERP · Unlocker · Crawl · Browser · Proxies |
 | **Supabase** | Postgres database — stores all results permanently |
-| **Redis (Upstash)** | Fast in-memory cache — avoids re-processing the same claim |
-| **httpx** | Modern Python HTTP client for API calls |
+| **Redis (Upstash)** | Fast in-memory cache — avoids re-processing |
+| **Sentry** | Error tracking (free tier) |
 
 ### Frontend
-| Technology | Why it's used |
-|------------|---------------|
-| **Next.js 16** | React framework — handles routing, builds, and server rendering |
+| Technology | Why |
+|------------|-----|
+| **Next.js 16** | React framework — routing, building, server rendering |
 | **React 19** | Library for building user interfaces |
-| **TypeScript** | JavaScript with types — catches bugs before they happen |
-| **Tailwind CSS v4** | Write CSS directly in HTML — fast, consistent styling |
-| **Framer Motion** | Smooth animations — makes the UI feel polished |
-| **Lucide React** | Beautiful open-source icons |
+| **TypeScript** | JavaScript with types — catches bugs early |
+| **Tailwind CSS v4** | Fast, consistent styling |
+| **Framer Motion** | Smooth animations |
+| **Lucide React** | Open-source icons |
 
 ---
 
@@ -191,267 +279,223 @@ FactGuard follows a standard **client-server architecture**:
 ```
 news-guard/
 │
-├── .github/workflows/ci.yml     # Auto-tests on every git push
-├── docker-compose.yml           # One-command server setup
-├── database/                    # SQL schema files
-│   ├── schema.sql               # Main database structure
-│   ├── schema2.sql              # Alternative schema
-│   ├── finance_cart.sql         # Finance/cart tables
-│   └── market.sql               # Market data tables
+├── database/                          # SQL schema files
+│   ├── schema.sql                     # Core tables (claims, results, sources)
+│   ├── schema2.sql                    # Migration
+│   ├── finance_cart.sql               # Financial + cart tables
+│   ├── market.sql                     # Market data tables
+│   └── threats.sql                    # Threats + audit_logs tables
 │
-├── factguard-backend/           # 👈 THE SERVER (Python)
-│   ├── .env                     # Secret keys (never commit!)
-│   ├── .env.example             # Template for .env
-│   ├── requirements.txt         # List of Python packages
-│   ├── Dockerfile               # Container packaging
+├── factguard-backend/                 # THE SERVER (Python)
+│   ├── .env.example                   # Environment variable template
+│   ├── requirements.txt               # Python packages
+│   ├── Dockerfile                     # Container build
+│   ├── render.yaml                    # Render deployment config
+│   │
 │   ├── app/
-│   │   ├── main.py              # App entry point — wires everything together
-│   │   ├── config.py            # Reads .env variables into Python objects
-│   │   ├── schemas.py           # Defines request/response data shapes
-│   │   ├── exceptions.py        # Custom error types
-│   │   ├── middleware.py        # Global error handling
-│   │   ├── logging_config.py    # Logging setup
-│   │   ├── dependencies.py      # Shared services (Gemini, Supabase clients)
+│   │   ├── main.py                    # Entry point — wires routes, middleware, CORS
+│   │   ├── config.py                  # Reads .env into typed Python objects
+│   │   ├── schemas.py                 # Request/response Pydantic models
+│   │   ├── exceptions.py              # Custom error types
+│   │   ├── logging_config.py          # Structured logging
+│   │   ├── dependencies.py            # Gemini + Supabase service singletons
 │   │   │
-│   │   ├── api/                 # API ROUTES (the "doors")
-│   │   │   ├── verify.py        # POST /verify — submit a claim
-│   │   │   ├── financial.py     # POST /financial — market query
-│   │   │   ├── pricing.py       # POST /cart — product search
-│   │   │   └── history.py       # GET /history — past results
+│   │   ├── middleware/                # Middleware package
+│   │   │   ├── __init__.py            # Backward-compatible exports
+│   │   │   ├── audit.py               # Audit logging middleware
+│   │   │   └── ratelimit.py           # Rate limiting (120 req/min/IP)
 │   │   │
-│   │   ├── services/            # BUSINESS LOGIC (the "brain")
-│   │   │   ├── gemini.py        # Gemini AI — verify mode prompt + parsing
-│   │   │   ├── deepseek.py      # DeepSeek AI — financial analysis
-│   │   │   ├── cart_ai.py       # Gemini AI — cart mode prompt + parsing
-│   │   │   ├── financial.py     # Orchestrates financial analysis (yfinance + AI)
-│   │   │   ├── pricing.py       # Orchestrates price comparison
-│   │   │   ├── router_ai.py     # Decides which mode a query belongs to
-│   │   │   ├── cache.py         # Redis — claim dedup + progress tracking
-│   │   │   ├── supabase_db.py   # Saves/loads data from Supabase
-│   │   │   ├── credibility.py   # Rates source credibility
-│   │   │   └── db.py            # Low-level database helpers
+│   │   ├── api/                       # API routes
+│   │   │   ├── verify.py              # POST /verify, GET /result
+│   │   │   ├── financial.py           # POST /financial
+│   │   │   ├── pricing.py             # POST /cart
+│   │   │   ├── threats.py             # GET+POST /threats/scan, GET /threats/report
+│   │   │   └── history.py             # GET /history
 │   │   │
-│   │   └── utils/               # UTILITY CODE (the "tools")
-│   │       ├── search.py        # Web search via BrightData (primary) or DuckDuckGo (fallback)
-│   │       ├── parsing.py       # Extracts JSON from AI responses
-│   │       ├── pricing_parser.py# Parses pricing data from search results
-│   │       ├── validators.py    # Detects SQL injection attempts
-│   │       └── constants.py     # Shared constants (verdicts, etc.)
+│   │   ├── services/                  # Business logic
+│   │   │   ├── gemini.py              # VERITAS AI prompt + analysis
+│   │   │   ├── deepseek.py            # DeepSeek financial analysis
+│   │   │   ├── groq_service.py        # Groq (llama-3.3-70b) fallback
+│   │   │   ├── cart_ai.py             # PRICEWATCH AI prompt
+│   │   │   ├── financial.py           # Orchestrates financial analysis
+│   │   │   ├── pricing.py             # Orchestrates price comparison
+│   │   │   ├── router_ai.py           # Query classifier (Gemini → Groq)
+│   │   │   ├── brightdata.py          # All 6 Bright Data integrations
+│   │   │   ├── routing.py             # Circuit breaker + MCP Discover + 3-tier fallback
+│   │   │   ├── credibility.py         # Composite source credibility scoring
+│   │   │   ├── threat_monitor.py      # Threat scanning + proxy enrichment
+│   │   │   ├── cache.py               # Redis operations
+│   │   │   ├── supabase_db.py         # Supabase persistence
+│   │   │   └── db.py                  # Low-level DB helpers
+│   │   │
+│   │   └── utils/
+│   │       ├── search.py              # Web search routing
+│   │       ├── duckduckgo.py          # DuckDuckGo fallback (extracted)
+│   │       ├── parsing.py             # JSON extraction + URL validation
+│   │       ├── pricing_parser.py      # Merchant classification
+│   │       ├── validators.py          # SQL injection detection
+│   │       └── constants.py           # Shared constants
 │   │
 │   ├── scripts/
-│   │   └── seed_demo.py         # Pre-loads demo data
-│   └── tests/                   # Automated tests
+│   │   └── seed_demo.py               # 15+ fixtures across 4 tracks
+│   └── tests/
+│       ├── conftest.py
 │       ├── test_constants.py
 │       ├── test_pricing_parser.py
 │       └── test_validators.py
 │
-├── factguard-frontend/          # 👈 THE BROWSER APP (TypeScript)
-│   ├── .env.local               # Frontend secrets
-│   ├── package.json             # List of JavaScript packages
-│   ├── Dockerfile               # Container packaging
+├── factguard-frontend/                # THE BROWSER APP (TypeScript)
+│   ├── .env.example
+│   ├── package.json
+│   ├── Dockerfile
+│   ├── vercel.json                    # Vercel deployment config
 │   │
-│   ├── app/                     # PAGES (each folder = a URL route)
-│   │   ├── layout.tsx           # Root layout — Nav bar, footer, fonts
-│   │   ├── globals.css          # Global styles + custom CSS classes
-│   │   ├── page.tsx             # Home page — mode switcher + input + splash
-│   │   │
-│   │   ├── loading/             # Loading page (shown while AI works)
-│   │   │   └── page.tsx         # Progress steps + animated spinner
-│   │   │
-│   │   ├── price-loading/       # Legacy cart loading page
-│   │   │   └── page.tsx
-│   │   │
-│   │   ├── history/             # History page
-│   │   │   └── page.tsx         # Shows past verifications
-│   │   │
-│   │   └── result/              # Result pages
-│   │       └── [jobId]/         # Dynamic route: /result/some-job-id
-│   │           ├── page.tsx     # Main result — shows verdict, sources, graph
-│   │           ├── layout.tsx   # OG image metadata for social sharing
-│   │           ├── FinancialResultView.tsx  # Financial mode result card
-│   │           └── CartResultView.tsx       # Cart mode result card
+│   ├── app/
+│   │   ├── layout.tsx                 # Root layout — Nav, footer, fonts
+│   │   ├── globals.css                # Global styles
+│   │   ├── page.tsx                   # Home — 4-mode switcher + input
+│   │   ├── loading/page.tsx           # Animated loading with progress
+│   │   ├── price-loading/page.tsx     # Legacy
+│   │   ├── history/page.tsx           # Past results
+│   │   └── result/[jobId]/
+│   │       ├── page.tsx               # Unified result page
+│   │       ├── layout.tsx             # OG image metadata
+│   │       ├── FinancialResultView.tsx
+│   │       ├── CartResultView.tsx
+│   │       └── ThreatResultView.tsx   # Security track + compliance report download
 │   │
-│   ├── components/              # REUSABLE UI PIECES
-│   │   ├── Nav.tsx              # Navigation bar
-│   │   ├── ModeSwitcher.tsx     # Toggle between verify/financial/cart
-│   │   ├── VerdictBadge.tsx     # Animated verdict card (Verified, Likely True, etc.)
-│   │   ├── ConfidencePill.tsx   # Confidence level badge
-│   │   ├── AgreementMeter.tsx   # Bar chart: supports vs contradicts
-│   │   ├── EvidenceTimeline.tsx # Sorted source list with tier badges
-│   │   ├── SourceGraph.tsx      # Interactive node graph of sources
-│   │   ├── BiasHeatmap.tsx      # Detected bias signals as pill chips
-│   │   ├── SignalBadge.tsx      # Financial signal (Bullish/Bearish/Neutral)
-│   │   ├── PriceChart.tsx       # Price history line chart
-│   │   ├── CartProductCard.tsx  # Product listing card with trust score
-│   │   ├── PriceComparisonTable.tsx
-│   │   ├── PriceCheckSection.tsx
-│   │   ├── PriceShareCard.tsx
-│   │   ├── ProductVariants.tsx
-│   │   ├── ShareCard.tsx        # Copy link to result
-│   │   ├── Skeleton.tsx         # Loading placeholder
-│   │   ├── SplashScreen.tsx     # First-visit welcome screen
-│   │   ├── ThemeProvider.tsx    # Dark/light mode switching
-│   │   ├── ThemeScript.tsx      # Prevents flash on page load
-│   │   ├── ErrorBoundary.tsx    # Catches crashes gracefully
-│   │   ├── ResultErrorBoundary.tsx
-│   │   └── ui/                  # Basic building blocks
+│   ├── components/
+│   │   ├── Nav.tsx                    # Health dots (MCP/SERP/Crawl/Unlock/Browser)
+│   │   ├── ModeSwitcher.tsx           # 4-mode toggle (Verify/Financial/Security/Cart)
+│   │   ├── VerdictBadge.tsx
+│   │   ├── ConfidencePill.tsx
+│   │   ├── AgreementMeter.tsx
+│   │   ├── EvidenceTimeline.tsx
+│   │   ├── SourceGraph.tsx
+│   │   ├── BiasHeatmap.tsx
+│   │   ├── ThreatResultView.tsx       # Security track results
+│   │   ├── ... (22+ components)
+│   │   └── ui/                        # Base UI components
 │   │       ├── badge.tsx
 │   │       ├── button.tsx
 │   │       ├── card.tsx
 │   │       ├── progress.tsx
 │   │       └── separator.tsx
 │   │
-│   ├── lib/                     # SHARED CODE
-│   │   ├── constants.ts         # Colors, example data
-│   │   ├── utils.ts             # Helper functions
-│   │   ├── polling.ts           # Polling utility
-│   │   └── useJobPolling.ts     # React hook: polls backend every 1.5s
+│   ├── lib/                           # Shared utilities
+│   │   ├── constants.ts
+│   │   ├── utils.ts
+│   │   └── useJobPolling.ts           # React hook — polls backend every 1.5s
 │   │
-│   └── types/
-│       └── index.ts             # All TypeScript type definitions
+│   ├── types/                         # TypeScript definitions
+│   │   └── index.ts                   # ThreatResult, TrackType, etc.
+│   │
+│   └── public/                        # Static assets
 │
-├── splash-demo.html             # Standalone demo page
-├── export_for_review.py         # Export tool
-└── README.md                    # This file!
+├── docker-compose.yml                 # One-command local setup
+├── splash-demo.html                   # Standalone demo page
+└── README.md                          # This file!
 ```
 
 ---
 
 ## Setup Guide
 
-### Prerequisites (What you need installed)
+### Prerequisites
 
-| Tool | Version | Why |
-|------|---------|-----|
-| **Python** | 3.12+ | Runs the backend |
-| **Node.js** | 20+ | Runs the frontend |
-| **pnpm** | Latest | Package manager (like npm but faster) |
-| **Git** | Any | Version control |
-| **Supabase account** | Free | Database hosting |
-| **Google AI Studio key** | Free | Gemini API access |
+- Python 3.12+
+- Node.js 20+
+- pnpm (latest)
+- Supabase account (free)
+- Google AI Studio key (free)
+- Groq API key (free) — [console.groq.com](https://console.groq.com)
+- BrightData account (hackathon — free credits)
 
-### Step 1: Clone the Repository
-
-```bash
-git clone <repository-url>
-cd news-guard
-```
-
-### Step 2: Set Up the Backend
+### Step 1: Clone & Install Backend
 
 ```bash
 cd factguard-backend
-
-# Create a virtual environment (isolates Python packages)
 python -m venv .venv
-
-# Activate it
-# On Windows:
-.venv\Scripts\activate
-# On Mac/Linux:
-source .venv/bin/activate
-
-# Install dependencies
+.venv\Scripts\activate    # Windows
+source .venv/bin/activate  # Mac/Linux
 pip install -r requirements.txt
 ```
 
-Create a file called `.env` inside `factguard-backend/`:
+### Step 2: Configure Environment
+
+Create `factguard-backend/.env`:
 
 ```env
-# Required: Get your key from https://aistudio.google.com/apikey
-GEMINI_API_KEYS=your-gemini-key-here
-
-# Required: Your Supabase project URL and service role key
+GEMINI_API_KEYS=your-key
 SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-
-# Required for BrightData (BrightData hackathon!):
+SUPABASE_SERVICE_ROLE_KEY=your-key
 BRIGHTDATA_API_KEY=your-brightdata-key
-
-# Optional but recommended:
+GROQ_API_KEY=your-groq-key          # Free fallback AI
+BRIGHTDATA_SERP_ZONE=your-zone       # SERP zone name from BrightData dashboard
 REDIS_URL=rediss://default:password@host:port
-FRONTEND_URL=http://localhost:3000
 ```
 
-### Step 3: Set Up the Database
+### Step 3: Set Up Database
 
-1. Go to [Supabase Dashboard](https://supabase.com)
-2. Create a new project (free tier works)
-3. Open the **SQL Editor**
-4. Copy and paste the contents of `database/schema.sql`
-5. Click **Run** — this creates all the tables
+1. Go to [Supabase Dashboard](https://supabase.com) → SQL Editor
+2. Run `database/schema.sql` (core tables)
+3. Run `database/threats.sql` (threat monitoring + audit_logs tables)
+4. Run `database/finance_cart.sql` (financial + cart tables)
 
-### Step 4: Seed Demo Data (Optional)
+### Step 4: Seed Demo Data
 
 ```bash
-cd factguard-backend
-python scripts/seed_demo.py
+python scripts/seed_demo.py   # Seeds 15+ fixtures across all 4 tracks
 ```
 
-This pre-loads some example claims and results into Redis so you can test without waiting for AI each time.
-
-### Step 5: Start the Backend
+### Step 5: Start Backend
 
 ```bash
-cd factguard-backend
-python -m uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --reload --port 8000
 ```
 
-Your backend is now running at `http://localhost:8000`. You can visit `http://localhost:8000/docs` for an interactive API testing page (Swagger UI).
+API docs at `http://localhost:8000/docs`
 
-### Step 6: Set Up the Frontend
-
-Open a **new terminal** (keep the backend running):
+### Step 6: Install & Start Frontend
 
 ```bash
 cd factguard-frontend
-
-# Install JavaScript dependencies
 pnpm install
-```
-
-Create `.env.local` in `factguard-frontend/`:
-
-```
-NEXT_PUBLIC_API_URL=http://localhost:8000
-```
-
-### Step 7: Start the Frontend
-
-```bash
-cd factguard-frontend
+echo "NEXT_PUBLIC_API_URL=http://localhost:8000" > .env.local
 pnpm dev
 ```
 
-Your frontend is now running at `http://localhost:3000`. Open it in your browser!
+Open `http://localhost:3000`
 
 ---
 
 ## API Documentation
 
-### Endpoints
+### All Endpoints
 
-| Method | Path | What it does |
+| Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/verify` | Submit a claim to fact-check |
-| `POST` | `/financial` | Submit a financial/market question |
-| `POST` | `/cart` | Submit a product name for price comparison |
-| `GET` | `/result/{job_id}?mode=verify\|financial\|cart` | Poll for the result |
+| `POST` | `/financial` | Submit a financial/market query |
+| `GET` `/POST` | `/threats/scan` | Scan news for threats (`?query=...`) |
+| `GET` | `/threats/report` | Generate compliance report |
+| `POST` | `/cart` | Submit product name for price comparison |
+| `GET` | `/result/{job_id}?mode=verify\|financial\|cart\|security` | Poll for result |
 | `GET` | `/history` | Get recent results |
-| `GET` | `/health` | Check if server is alive |
+| `GET` | `/health` | Server health |
+| `GET` | `/routing/health` | Circuit breaker status per integration |
 
-### Verify Mode — Full Response Shape
+### Full Verify Response
 
 ```json
 {
   "status": "done",
-  "jobId": "abc-123-def",
-  "mode": "verify",
+  "jobId": "abc-123",
   "claim": "Is the Earth flat?",
   "verdict": "Likely Misleading",
   "confidence": "High",
-  "narrative_frame": "Uses a false dichotomy to dismiss centuries of scientific consensus.",
-  "summary": "Overwhelming scientific evidence from NASA, NOAA, and every major space agency confirms Earth is an oblate spheroid. The claim contradicts all available satellite imagery, physics, and direct observation.",
+  "narrative_frame": "Uses a false dichotomy to dismiss scientific consensus.",
+  "summary": "Overwhelming evidence from NASA, NOAA confirms Earth is an oblate spheroid.",
   "supports": 0,
   "contradicts": 5,
   "neutral": 1,
@@ -460,197 +504,57 @@ Your frontend is now running at `http://localhost:3000`. Open it in your browser
   "sources": [
     {
       "title": "NASA: Earth Fact Sheet",
-      "url": "https://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html",
+      "url": "https://nssdc.gsfc.nasa.gov/...",
       "author": "NASA",
       "date": "2024-01-15",
       "stance": "contradicts",
       "credibility": "High",
+      "domain_authority_score": 1.0,
+      "temporal_freshness_score": 0.7,
+      "credibility_score": 0.92,
       "tier": 1,
       "relevance": 10,
-      "summary": "NASA provides detailed measurements confirming Earth's curvature.",
-      "quote": "Earth's equatorial radius is 6378 km, polar radius is 6357 km."
+      "summary": "NASA confirms Earth's curvature.",
+      "quote": "Earth's equatorial radius is 6378 km."
     }
   ]
 }
 ```
 
-### Financial Mode — Key Fields
+### Threat Scan Response
 
 ```json
 {
-  "analysis": {
-    "signal": "Bullish",
-    "signal_strength": 78,
-    "asset": "Tesla Inc. (TSLA)",
-    "current_price": "$345.20",
-    "price_trend": "Up",
-    "trend_magnitude": "Strong",
-    "risk_level": "Medium",
-    "risk_catalysts": [
-      "Regulatory probe into Autopilot claims",
-      "EU tariff escalation on Chinese EVs",
-      "Bond yield spike compressing growth valuations"
-    ],
-    "key_factors": ["Q2 delivery beat", "Energy storage revenue up 40%"],
-    "summary": "3-4 sentence institutional-quality brief...",
-    "prediction_30d": {
-      "bull_case": "$380+ (45%) — requires FSD approval catalyst",
-      "base_case": "$340-360 (35%) — steady delivery growth",
-      "bear_case": "$300-320 (20%) — triggered by macro downturn"
-    },
-    "data_freshness": "real-time"
-  }
-}
-```
-
-### Cart Mode — Key Fields
-
-```json
-{
-  "analysis": {
-    "product_name": "Sony WH-1000XM5",
-    "msrp": "$349.99",
-    "fair_market_range": { "min": "$288.00", "max": "$349.99", "currency": "USD" },
-    "best_deal": {
-      "merchant": "Amazon",
-      "price": "$288.00",
-      "url": "https://amazon.com/...",
-      "reason": "Lowest price from a verified authorized retailer with free returns"
-    },
-    "listings": [{
-      "title": "Sony WH-1000XM5 Wireless...",
-      "merchant": "Amazon",
-      "price": 288.00,
-      "currency": "USD",
-      "url": "https://...",
-      "trust_level": "GREEN",
-      "deal_score": 92,
-      "trust_reason": "Amazon is a verified authorized Sony retailer",
-      "counterfeit_risk": "None",
-      "condition": "New",
-      "in_stock": true
-    }],
-    "analysis": {
-      "warnings": ["Price on eBay is 35% below MSRP — high counterfeit risk"],
-      "recommendation": "Buy from Amazon at $288.00...",
-      "price_trend": "Stable",
-      "best_time_to_buy": "Now"
+  "jobId": "uuid",
+  "threats": [
+    {
+      "threat_type": "vendor",
+      "severity": "high",
+      "title": "Supply chain vendor reports data breach",
+      "description": "A major vendor reported a breach...",
+      "source_url": "https://krebsonsecurity.com",
+      "source_domain": "krebsonsecurity.com",
+      "confidence": 0.85,
+      "alert_status": "new",
+      "body_preview": "The breach exposed...",
+      "bright_data_product": "Residential Proxies"
     }
-  }
+  ],
+  "count": 1
 }
 ```
 
-### Processing Response (while waiting)
+### Circuit Breaker Health Response
 
 ```json
 {
-  "status": "processing",
-  "jobId": "abc-123-def"
+  "mcp": { "status": "closed", "failures": 0 },
+  "serp": { "status": "closed", "failures": 1 },
+  "crawl": { "status": "closed", "failures": 0 },
+  "unlocker": { "status": "open", "failures": 3, "cooldown_remaining": 18 },
+  "browser": { "status": "half-open", "failures": 2 }
 }
 ```
-
----
-
-## Data Flow
-
-Here's exactly what happens when you type a claim and press submit:
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│ 1. YOU type "The Earth is flat" and click "Analyse Claim"          │
-│    ┌─────────────────────────────────────────────────────────┐     │
-│    │ Frontend: POST /verify  { "claim": "The Earth is flat" }│     │
-│    └────────────┬────────────────────────────────────────────┘     │
-└─────────────────┼───────────────────────────────────────────────────┘
-                  │
-                  ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ 2. BACKEND receives the claim                                      │
-│    ┌─────────────────────────────────────────────────────────┐     │
-│    │ a. Creates a job record in Supabase database             │     │
-│    │ b. Sets Redis progress: "Checking cache..."             │     │
-│    │ c. Checks Redis for an identical past claim (SHA-256    │     │
-│    │    hash) → HIT? Return cached result instantly → DONE!  │     │
-│    │ d. MISS? Start background processing...                 │     │
-│    └─────────────────────────────────────────────────────────┘     │
-└─────────────────┼───────────────────────────────────────────────────┘
-                  │
-                  ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ 3. WEB SEARCH (BrightData)                                         │
-│    ┌─────────────────────────────────────────────────────────┐     │
-│    │ a. Backend calls BrightData SERP API:                   │     │
-│    │    "https://api.brightdata.com/request"                 │     │
-│    │    with query "The Earth is flat"                       │     │
-│    │ b. BrightData returns Google-like search results        │     │
-│    │ c. Backend extracts: title, URL, snippet from each      │     │
-│    │ d. If BrightData fails → falls back to DuckDuckGo       │     │
-│    │ e. Sets Redis progress: "Analysing with AI..."          │     │
-│    └─────────────────────────────────────────────────────────┘     │
-└─────────────────┼───────────────────────────────────────────────────┘
-                  │
-                  ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ 4. AI ANALYSIS (Gemini 2.5 Flash)                                  │
-│    ┌─────────────────────────────────────────────────────────┐     │
-│    │ a. Backend builds a prompt (instructions + search data): │     │
-│    │    "You are VERITAS... Here are the search results...   │     │
-│    │     Now evaluate this claim: 'The Earth is flat'"       │     │
-│    │ b. Gemini thinks inside <scratchpad>:                   │     │
-│    │    Step 1: Is the claim empirical? Yes.                 │     │
-│    │    Step 2: What framing? False dichotomy.               │     │
-│    │    Step 3: Source triage — NASA contradicts, ...        │     │
-│    │    Step 4: Strong consensus against claim.              │     │
-│    │    Step 5: Verdict = Likely Misleading, High confidence │     │
-│    │ c. Gemini returns structured JSON                       │     │
-│    │ d. Backend validates: all required fields present?       │     │
-│    │    verdict valid? sources have real URLs?               │     │
-│    └─────────────────────────────────────────────────────────┘     │
-└─────────────────┼───────────────────────────────────────────────────┘
-                  │
-                  ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ 5. STORE & RETURN                                                  │
-│    ┌─────────────────────────────────────────────────────────┐     │
-│    │ a. Save result to Supabase (permanent storage)          │     │
-│    │ b. Save to Redis cache (24h TTL — next hit is instant)  │     │
-│    │ c. Set Redis progress: "Saving results..."              │     │
-│    │ d. Mark job as complete                                 │     │
-│    └─────────────────────────────────────────────────────────┘     │
-└─────────────────┼───────────────────────────────────────────────────┘
-                  │
-                  ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ 6. FRONTEND receives the result                                    │
-│    ┌─────────────────────────────────────────────────────────┐     │
-│    │ a. The loading page was polling every 1.5 seconds:      │     │
-│    │    GET /result/job-123?mode=verify                       │     │
-│    │ b. Now status = "done" → redirects to /result/job-123   │     │
-│    │ c. Result page shows:                                   │     │
-│    │    - Verdict badge with glow animation                   │     │
-│    │    - Confidence + source diversity badges               │     │
-│    │    - Narrative frame (italic blockquote)                │     │
-│    │    - Summary explanation                                │     │
-│    │    - Agreement meter (bar chart)                         │     │
-│    │    - Bias heatmap (if biases detected)                  │     │
-│    │    - Evidence timeline (sorted by tier)                  │     │
-│    │    - Source graph (toggle list/graph view)              │     │
-│    │    - Share + download buttons                           │     │
-│    └─────────────────────────────────────────────────────────┘     │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
-### Key Concept: Why Polling?
-
-You might wonder: "Why does the frontend keep asking (polling) instead of waiting for an answer?"
-
-This is a common pattern in web development. Since AI analysis can take 15-30 seconds, we can't keep the HTTP connection open that long. Instead:
-
-1. The backend immediately returns a `jobId` (a unique identifier)
-2. The frontend asks "is it done yet?" every 1.5 seconds
-3. When the answer is ready, the frontend shows the result
-
-Think of it like ordering pizza: you get a ticket number right away, then check back until your order is ready.
 
 ---
 
@@ -658,40 +562,38 @@ Think of it like ordering pizza: you get a ticket number right away, then check 
 
 ### Backend (`factguard-backend/.env`)
 
-| Variable | Required | Default | What it does |
-|----------|----------|---------|-------------|
-| `GEMINI_API_KEYS` | ✅ Yes | — | Comma-separated Gemini API keys (you can have multiple for redundancy) |
-| `SUPABASE_URL` | ✅ Yes | — | Your Supabase project URL (found in Supabase dashboard → Settings → API) |
-| `SUPABASE_SERVICE_ROLE_KEY` | ✅ Yes | — | Supabase admin key (kept secret — never in frontend code!) |
-| `BRIGHTDATA_API_KEY` | ✅ Yes | — | BrightData API key for web search |
-| `DEEPSEEK_API_KEYS` | No | — | Comma-separated DeepSeek/OpenRouter keys (fallback AI) |
-| `REDIS_URL` | No | — | Redis connection string (for caching). Without it, app still works — just slower |
-| `FRONTEND_URL` | No | `http://localhost:3000` | Which domain is allowed to call the API (CORS) |
-| `GEMINI_MODEL_NAME` | No | `gemini-2.5-flash` | Which Gemini model to use |
-| `CACHE_TTL` | No | `86400` | How many seconds to cache a claim result (86400 = 24 hours) |
-| `LOG_LEVEL` | No | `INFO` | How detailed logs should be (DEBUG = very detailed, INFO = normal, WARNING = only issues) |
+| Variable | Required | Default | Description |
+|----------|:--------:|---------|-------------|
+| `GEMINI_API_KEYS` | ✅ | — | Comma-separated Gemini API keys |
+| `SUPABASE_URL` | ✅ | — | Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | ✅ | — | Supabase admin key |
+| `BRIGHTDATA_API_KEY` | ✅ | — | BrightData API key |
+| `GROQ_API_KEY` | — | — | Groq API key (free fallback AI) |
+| `BRIGHTDATA_SERP_ZONE` | — | — | BrightData SERP zone name (auto-discovered if unset) |
+| `CLAUDE_API_KEYS` | — | — | Comma-separated Claude API keys |
+| `DEEPSEEK_API_KEYS` | — | — | OpenRouter/DeepSeek keys |
+| `REDIS_URL` | — | — | Redis connection string |
+| `FRONTEND_URL` | — | `http://localhost:3000` | CORS allowed origin |
+| `GEMINI_MODEL_NAME` | — | `gemini-2.5-flash` | Gemini model |
+| `CACHE_TTL` | — | `86400` | Cache TTL in seconds |
+| `LOG_LEVEL` | — | `INFO` | Logging verbosity |
 
 ### Frontend (`factguard-frontend/.env.local`)
 
-| Variable | Required | What it does |
-|----------|----------|-------------|
-| `NEXT_PUBLIC_API_URL` | ✅ Yes | The backend's URL (e.g. `http://localhost:8000` or your deployed URL) |
+| Variable | Required | Description |
+|----------|:--------:|-------------|
+| `NEXT_PUBLIC_API_URL` | ✅ | Backend URL (e.g. `http://localhost:8000`) |
 
 ---
 
 ## Key Design Decisions
 
-### Why Redis for caching?
-Redis is an in-memory database — it's extremely fast. When you check the same claim twice, Redis returns the cached result in milliseconds instead of waiting 20 seconds for the AI again. This also saves money on API calls.
-
-### Why polling instead of WebSockets?
-WebSockets (real-time two-way communication) would be more elegant, but polling is simpler and more reliable. The frontend asks "is it done?" every 1.5 seconds — this works on any hosting platform and doesn't require special server configuration.
-
-### Why multiple API keys?
-Both Gemini and DeepSeek have rate limits (you can only make so many requests per minute). By providing multiple keys, FactGuard automatically rotates to the next key when one runs out.
-
-### Why source fabrication prohibition?
-Large language models (LLMs) sometimes "hallucinate" — they make up convincing-sounding URLs and quotes. The VERITAS prompt has strict rules against this, and the backend validates that every source URL actually came from the search results.
-
-### Why bias detection?
-Standard fact-checking tells you IF something is true. FactGuard also tells you HOW the claim tries to manipulate you (e.g., cherry-picking data, using emotional language). This is a unique feature that helps users build critical thinking skills.
+- **Three-provider free AI resilience chain**: Gemini → DeepSeek → Groq + heuristic fallback — enterprise-grade failover without paid APIs
+- **Circuit breaker pattern**: Each Bright Data integration has independent failure tracking with auto-reset, preventing cascading failures
+- **3-tier content extraction**: Crawl API → Web Unlocker → Scraping Browser — each tier handles progressively harder cases
+- **Composite credibility scoring**: Domain authority (35%) + stance alignment (25%) + temporal freshness (20%) + base tier (20%)
+- **Multi-track architecture**: Single product, four demo scenarios — GTM Intelligence, Finance & Risk, Security & Compliance, Cart
+- **Source fabrication prohibition**: Every URL is validated against actual search results — no AI hallucinations
+- **Polling architecture**: Job-based async processing with Redis progress tracking — works on any hosting platform
+- **`bright_data_product` tagging**: Every extraction and discovery call is tagged with the originating Bright Data product name
+- **MCP Discover as Step 0**: Before any extraction, queries MCP Server for available tools

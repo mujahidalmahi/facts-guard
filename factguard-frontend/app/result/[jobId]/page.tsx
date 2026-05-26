@@ -58,6 +58,10 @@ import {
   CartResultView,
 } from './CartResultView';
 
+import {
+  ThreatResultView,
+} from './ThreatResultView';
+
 const API_URL =
   process.env
     .NEXT_PUBLIC_API_URL ||
@@ -307,6 +311,14 @@ export default function ResultPage({
   if (!data) {
     return (
       <ResultSkeleton />
+    );
+  }
+
+  if (mode === 'security' || data.mode === 'security') {
+    return (
+      <ResultErrorBoundary>
+        <ThreatResultView data={data} />
+      </ResultErrorBoundary>
     );
   }
 

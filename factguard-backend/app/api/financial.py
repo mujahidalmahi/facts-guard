@@ -31,9 +31,6 @@ from app.utils.constants import (
     STATUS_PROCESSING,
 )
 
-from app.utils.parsing import (
-    parse_json_response as _parse,
-)
 
 logger = get_logger(
     "financial"

@@ -85,7 +85,47 @@ export interface PriceCheckResult {
 export type AppMode =
   | 'verify'
   | 'financial'
+  | 'cart'
+  | 'security';
+
+export type TrackType =
+  | 'gtm'
+  | 'finance'
+  | 'security'
   | 'cart';
+
+export type ThreatType =
+  | 'brand'
+  | 'regulatory'
+  | 'vendor'
+  | 'disinformation'
+  | 'general';
+
+export type Severity =
+  | 'low'
+  | 'medium'
+  | 'high'
+  | 'critical';
+
+export type AlertStatus =
+  | 'new'
+  | 'acknowledged'
+  | 'investigating'
+  | 'resolved'
+  | 'dismissed';
+
+export interface ThreatResult {
+  jobId: string;
+  threat_type: ThreatType;
+  severity: Severity;
+  title: string;
+  description: string;
+  source_url: string;
+  source_domain: string;
+  confidence: number;
+  alert_status: AlertStatus;
+  detected_at: string;
+}
 
 // =========================
 // Financial Types

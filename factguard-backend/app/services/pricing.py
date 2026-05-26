@@ -50,7 +50,7 @@ CACHE_PREFIX = (
 
 
 def _listing_to_insert(
-    l: dict,
+    listing: dict,
     query_id: str,
 ) -> dict:
     return {
@@ -58,46 +58,46 @@ def _listing_to_insert(
             query_id,
 
         "title":
-            l.get(
+            listing.get(
                 "title",
                 "",
             ),
 
         "price":
-            l.get(
+            listing.get(
                 "price"
             ),
 
         "currency":
-            l.get(
+            listing.get(
                 "currency",
                 "USD",
             ),
 
         "merchant":
-            l.get(
+            listing.get(
                 "merchant",
                 "",
             ),
 
         "url":
-            l.get(
+            listing.get(
                 "url",
                 "",
             ),
 
         "image":
-            l.get(
+            listing.get(
                 "image"
             ),
 
         "condition":
-            l.get(
+            listing.get(
                 "condition"
             ),
 
         "model_name":
-            l.get(
+            listing.get(
                 "model_name"
             ),
     }
@@ -206,11 +206,11 @@ def _build_ai_analysis(
 
 
 def _listing_to_response(
-    l: dict,
+    listing: dict,
 ) -> dict:
     trust = (
         get_trust_level(
-            l.get(
+            listing.get(
                 "merchant",
                 "",
             )
@@ -231,28 +231,28 @@ def _listing_to_response(
 
     return {
         "title":
-            l.get(
+            listing.get(
                 "title",
                 "",
             ),
 
         "merchant":
-            l.get(
+            listing.get(
                 "merchant",
                 "Unknown",
             ),
 
         "price":
-            l.get("price"),
+            listing.get("price"),
 
         "currency":
-            l.get(
+            listing.get(
                 "currency",
                 "USD",
             ),
 
         "url":
-            l.get(
+            listing.get(
                 "url",
                 "",
             ),
@@ -265,7 +265,7 @@ def _listing_to_response(
         "counterfeit_risk": "None",
 
         "condition":
-            l.get(
+            listing.get(
                 "condition",
                 "Unknown",
             ),
@@ -326,10 +326,10 @@ async def save_listings(
     try:
         rows = [
             _listing_to_insert(
-                l,
+                listing,
                 query_id,
             )
-            for l in listings
+            for listing in listings
         ]
 
         await insert(
@@ -552,9 +552,9 @@ async def get_full_price_result(
 
         "listings": [
             _listing_to_response(
-                l
+                listing
             )
-            for l in listings_data
+            for listing in listings_data
         ],
 
         "analysis":

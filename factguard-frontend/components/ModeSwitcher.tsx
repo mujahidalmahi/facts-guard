@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Shield, TrendingUp, ShoppingCart } from 'lucide-react';
+import { Shield, TrendingUp, ShoppingCart, AlertTriangle } from 'lucide-react';
 import type { AppMode } from '@/types';
 
 const MODES = [
@@ -16,6 +16,12 @@ const MODES = [
     label: 'Financial',
     Icon: TrendingUp,
     desc: 'Market analysis',
+  },
+  {
+    id: 'security' as AppMode,
+    label: 'Security',
+    Icon: AlertTriangle,
+    desc: 'Threat monitoring',
   },
   {
     id: 'cart' as AppMode,

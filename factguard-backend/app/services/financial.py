@@ -12,7 +12,6 @@ from app.logging_config import (
 )
 
 from app.services.cache import (
-    get_job_query,
     set_job_query,
     set_progress,
     push_claim_to_history,

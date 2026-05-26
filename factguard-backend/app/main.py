@@ -30,6 +30,10 @@ from app.api.financial import (
     router as financial_router,
 )
 
+from app.api.threats import (
+    router as threats_router,
+)
+
 from app.config import (
     settings,
 )
@@ -47,6 +51,9 @@ from app.middleware import (
     general_exception_handler,
     validation_error_handler,
 )
+from app.middleware.audit import AuditMiddleware
+from app.middleware.ratelimit import RateLimitMiddleware
+from app.services.routing import health_check as routing_health
 
 logger = get_logger(
     "main"
@@ -59,15 +66,9 @@ async def lifespan(
 ):
     try:
         settings.validate_required_fields()
-
-        logger.info(
-            "All required env vars present"
-        )
-
+        logger.info("All required env vars present")
     except ValueError as e:
-        logger.error(
-            f"Config warning: {e}"
-        )
+        logger.error(f"Config warning: {e}")
 
     yield
 
@@ -93,6 +94,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.add_middleware(AuditMiddleware)
+app.add_middleware(RateLimitMiddleware, max_requests=30, window_seconds=60)
 
 app.add_exception_handler(
     FactGuardException,
@@ -126,6 +130,10 @@ app.include_router(
     history_router
 )
 
+app.include_router(
+    threats_router
+)
+
 
 @app.get("/")
 async def root():
@@ -137,6 +145,7 @@ async def root():
 
 @app.get("/health")
 async def health():
+    cb_status = await routing_health()
     return {
         "status":
             "ok",
@@ -144,4 +153,9 @@ async def health():
             settings.APP_VERSION,
         "environment":
             settings.ENVIRONMENT,
+        "circuit_breakers": cb_status,
     }
+
+@app.get("/routing/health")
+async def routing_status():
+    return await routing_health()

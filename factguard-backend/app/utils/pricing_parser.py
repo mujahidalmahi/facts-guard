@@ -167,10 +167,10 @@ def get_priority(merchant: str) -> int:
 def sort_listings(listings: list[dict]) -> list[dict]:
     return sorted(
         listings,
-        key=lambda l: (
-            get_priority(l.get("merchant", "")),
-            l.get("price") is None,
-            l.get("price") or float("inf"),
+        key=lambda listing: (
+            get_priority(listing.get("merchant", "")),
+            listing.get("price") is None,
+            listing.get("price") or float("inf"),
         ),
     )
 

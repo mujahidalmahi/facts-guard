@@ -56,6 +56,21 @@ const MODE_CFG = {
       'RTX 5090 GPU',
     ],
   },
+
+  security: {
+    headline: 'ThreatGuard',
+    sub: 'Real-time brand, regulatory & vendor threat monitoring',
+    placeholder:
+      'Data breach | compliance update | disinformation campaign...',
+    cta: 'Scan Threats',
+    endpoint: '/threats/scan',
+    field: 'query',
+    examples: [
+      'Data breach at key vendor',
+      'New GDPR compliance requirement',
+      'Disinformation campaign targeting financial sector',
+    ],
+  },
 } satisfies Record<AppMode, object>;
 
 export default function HomePage() {
@@ -146,6 +161,8 @@ export default function HomePage() {
               ? 'AI Fact Intelligence'
               : mode === 'financial'
               ? 'Live Market Oracle'
+              : mode === 'security'
+              ? 'Real-Time Threat Monitor'
               : 'Price Trust Engine'}
           </motion.div>
 
