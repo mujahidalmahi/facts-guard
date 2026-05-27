@@ -16,9 +16,7 @@ from app.logging_config import (
     get_logger,
 )
 
-logger = get_logger(
-    "deepseek"
-)
+logger = get_logger("deepseek")
 
 api_keys: list[str] = []
 
@@ -27,14 +25,10 @@ def _get_api_keys() -> list[str]:
     global api_keys
 
     if not api_keys:
-        api_keys = list(
-            settings.deepseek_api_keys_list
-        )
+        api_keys = list(settings.deepseek_api_keys_list)
 
         if not api_keys:
-            raise ValueError(
-                "DEEPSEEK_API_KEYS not configured"
-            )
+            raise ValueError("DEEPSEEK_API_KEYS not configured")
 
     return api_keys
 
@@ -148,16 +142,11 @@ async def deepseek_financial_analysis(
     query: str,
     context: str,
 ) -> dict:
-    today = datetime.now(
-        timezone.utc
-    ).strftime("%Y-%m-%d")
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     (
         build_search_context(
-            json.loads(context)
-            if isinstance(context, str)
-            and context.startswith("[")
-            else []
+            json.loads(context) if isinstance(context, str) and context.startswith("[") else []
         )
         if False
         else context
@@ -171,67 +160,44 @@ async def deepseek_financial_analysis(
 
     keys = _get_api_keys()
 
-    for attempt, key in enumerate(
-        keys
-    ):
+    for attempt, key in enumerate(keys):
         try:
-            logger.info(
-                f"DeepSeek attempt {attempt + 1}/{len(keys)}"
-            )
+            logger.info(f"DeepSeek attempt {attempt + 1}/{len(keys)}")
 
             client = _get_client(key)
 
-            response = (
-                client.chat.completions.create(
-                    model=
-                        settings.FINANCIAL_MODEL,
-                    messages=[
-                        {
-                            "role":
-                                "system",
-                            "content":
-                                FINANCIAL_SYSTEM_PROMPT,
-                        },
-                        {
-                            "role":
-                                "user",
-                            "content":
-                                user_prompt,
-                        }
-                    ],
-                    temperature=0.2,
-                )
+            response = client.chat.completions.create(
+                model=settings.FINANCIAL_MODEL,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": FINANCIAL_SYSTEM_PROMPT,
+                    },
+                    {
+                        "role": "user",
+                        "content": user_prompt,
+                    },
+                ],
+                temperature=0.2,
             )
 
-            text = (
-                response
-                .choices[0]
-                .message.content
-            )
+            text = response.choices[0].message.content
 
-            result = json.loads(
-                text
-            )
+            result = json.loads(text)
 
-            result["analysis_date"] = (
-                result.get(
-                    "analysis_date",
-                    today,
-                )
+            result["analysis_date"] = result.get(
+                "analysis_date",
+                today,
             )
 
             return result
 
         except Exception as e:
-            logger.error(
-                f"DeepSeek attempt {attempt + 1} failed: {e}"
-            )
+            logger.error(f"DeepSeek attempt {attempt + 1} failed: {e}")
 
             continue
 
-    logger.error(
-        "All DeepSeek API keys exhausted"
-    )
+    logger.error("All DeepSeek API keys exhausted")
 
     fallback = dict(FALLBACK_RESPONSE)
     fallback["analysis_date"] = today

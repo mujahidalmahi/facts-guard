@@ -26,7 +26,5 @@ def search(query: str, max_results: int = 8) -> list[dict]:
         ]
 
     except Exception as e:
-        logger.warning(
-            f"DuckDuckGo search failed: {e}"
-        )
+        logger.warning(f"DuckDuckGo search failed: {e}")
         return []

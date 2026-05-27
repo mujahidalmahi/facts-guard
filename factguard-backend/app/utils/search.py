@@ -12,15 +12,11 @@ from app.services.routing import (
 )
 from app.utils.duckduckgo import search as _duckduckgo_search
 
-logger = get_logger(
-    "search"
-)
+logger = get_logger("search")
 
 SEARCH_RESULTS_MAX = 8
 
-BRIGHTDATA_ENDPOINT = (
-    "https://api.brightdata.com/request"
-)
+BRIGHTDATA_ENDPOINT = "https://api.brightdata.com/request"
 
 
 def _brightdata_search(
@@ -33,10 +29,7 @@ def _brightdata_search(
     )
 
     if not api_key:
-        logger.warning(
-            "BRIGHTDATA_API_KEY missing — "
-            "falling back to DDGS"
-        )
+        logger.warning("BRIGHTDATA_API_KEY missing — " "falling back to DDGS")
 
         return _duckduckgo_search(
             query,
@@ -46,19 +39,14 @@ def _brightdata_search(
     try:
         payload = {
             "zone": "serp",
-            "url":
-                "https://www.google.com/"
-                f"search?q={query}"
-                f"&num={max_results}",
+            "url": "https://www.google.com/" f"search?q={query}" f"&num={max_results}",
             "format": "json",
             "country": "us",
         }
 
         headers = {
-            "Authorization":
-                f"Bearer {api_key}",
-            "Content-Type":
-                "application/json",
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
         }
 
         resp = httpx.post(
@@ -79,44 +67,34 @@ def _brightdata_search(
         for r in organic[:max_results]:
             results.append(
                 {
-                    "title":
+                    "title": r.get(
+                        "title",
+                        "",
+                    ),
+                    "url": r.get(
+                        "link",
                         r.get(
-                            "title",
+                            "url",
                             "",
                         ),
-                    "url":
+                    ),
+                    "snippet": r.get(
+                        "snippet",
                         r.get(
-                            "link",
-                            r.get(
-                                "url",
-                                "",
-                            ),
+                            "description",
+                            "",
                         ),
-                    "snippet":
-                        r.get(
-                            "snippet",
-                            r.get(
-                                "description",
-                                "",
-                            ),
-                        ),
-                    "source":
-                        "brightdata_serp",
+                    ),
+                    "source": "brightdata_serp",
                 }
             )
 
-        logger.info(
-            f"BrightData SERP returned "
-            f"{len(results)} results"
-        )
+        logger.info(f"BrightData SERP returned " f"{len(results)} results")
 
         return results
 
     except Exception as e:
-        logger.warning(
-            f"BrightData SERP failed: {e} "
-            "— falling back to DDGS"
-        )
+        logger.warning(f"BrightData SERP failed: {e} " "— falling back to DDGS")
 
         return _duckduckgo_search(
             query,
@@ -145,19 +123,14 @@ def brightdata_scrape_product(
         resp = httpx.post(
             BRIGHTDATA_ENDPOINT,
             json=payload,
-            headers={
-                "Authorization":
-                    f"Bearer {api_key}"
-            },
+            headers={"Authorization": f"Bearer {api_key}"},
             timeout=30,
         )
 
         return resp.text[:4000]
 
     except Exception as e:
-        logger.warning(
-            f"Web Unlocker scrape failed: {e}"
-        )
+        logger.warning(f"Web Unlocker scrape failed: {e}")
 
         return ""
 
@@ -171,10 +144,7 @@ def _search_sync(
         "brightdata",
     )
 
-    if (
-        provider
-        == "brightdata"
-    ):
+    if provider == "brightdata":
         return _brightdata_search(
             query,
             max_results,

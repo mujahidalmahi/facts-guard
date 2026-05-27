@@ -92,22 +92,22 @@ MERCHANT_PRIORITY: dict[str, int] = {
 }
 
 PRICE_PATTERNS = [
-    re.compile(r'\$[\s]*([\d,]+\.?\d*)'),
-    re.compile(r'€[\s]*([\d,]+\.?\d*)'),
-    re.compile(r'£[\s]*([\d,]+\.?\d*)'),
-    re.compile(r'([\d,]+\.?\d*)\s*€'),
-    re.compile(r'([\d,]+\.?\d*)\s*USD'),
-    re.compile(r'price[:\s]*\$?([\d,]+\.?\d*)', re.IGNORECASE),
-    re.compile(r'\$\s*([\d,]+)\s*-\s*\$\s*([\d,]+)'),
-    re.compile(r'from\s*\$?([\d,]+\.?\d*)', re.IGNORECASE),
+    re.compile(r"\$[\s]*([\d,]+\.?\d*)"),
+    re.compile(r"€[\s]*([\d,]+\.?\d*)"),
+    re.compile(r"£[\s]*([\d,]+\.?\d*)"),
+    re.compile(r"([\d,]+\.?\d*)\s*€"),
+    re.compile(r"([\d,]+\.?\d*)\s*USD"),
+    re.compile(r"price[:\s]*\$?([\d,]+\.?\d*)", re.IGNORECASE),
+    re.compile(r"\$\s*([\d,]+)\s*-\s*\$\s*([\d,]+)"),
+    re.compile(r"from\s*\$?([\d,]+\.?\d*)", re.IGNORECASE),
 ]
 
-MODEL_SEPARATORS = re.compile(r'[,\(\)\[\]\-–—/]|\s+\d{4}\s*$')
+MODEL_SEPARATORS = re.compile(r"[,\(\)\[\]\-–—/]|\s+\d{4}\s*$")
 SPEC_PATTERNS = [
-    re.compile(r'(\d+[Gg][Bb])'),
-    re.compile(r'(RTX|GTX|RX|Arc)\s*\d+'),
-    re.compile(r'(i\d|Ryzen\s*\d|Intel|AMD|Apple\s*M\d)'),
-    re.compile(r'(\d+[Kk]\s*(OLED|LCD|IPS|LED)?)'),
+    re.compile(r"(\d+[Gg][Bb])"),
+    re.compile(r"(RTX|GTX|RX|Arc)\s*\d+"),
+    re.compile(r"(i\d|Ryzen\s*\d|Intel|AMD|Apple\s*M\d)"),
+    re.compile(r"(\d+[Kk]\s*(OLED|LCD|IPS|LED)?)"),
 ]
 
 
@@ -118,7 +118,7 @@ def extract_price(text: str) -> Optional[float]:
             try:
                 groups = match.groups()
                 price_str = groups[0] if groups else match.group(0)
-                price_str = re.sub(r'[^\d.]', '', price_str.replace(',', ''))
+                price_str = re.sub(r"[^\d.]", "", price_str.replace(",", ""))
                 if price_str and float(price_str) > 0:
                     return float(price_str)
             except (ValueError, IndexError):
@@ -132,9 +132,9 @@ def classify_merchant(url: str) -> str:
         if domain_key in url_lower:
             return merchant_name
 
-    domain_match = re.search(r'https?://(?:www\.)?([^/]+)', url_lower)
+    domain_match = re.search(r"https?://(?:www\.)?([^/]+)", url_lower)
     if domain_match:
-        domain_parts = domain_match.group(1).split('.')
+        domain_parts = domain_match.group(1).split(".")
         if len(domain_parts) >= 2:
             return domain_parts[-2].title()
     return "Unknown Merchant"

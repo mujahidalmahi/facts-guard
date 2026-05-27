@@ -31,36 +31,23 @@ from app.utils.constants import (
     STATUS_PROCESSING,
 )
 
-
-logger = get_logger(
-    "financial"
-)
+logger = get_logger("financial")
 
 router = APIRouter()
 
 
-@router.post(
-    "/financial"
-)
+@router.post("/financial")
 async def financial(
     payload: FinancialRequest,
     background_tasks: BackgroundTasks,
 ):
-    job_id = str(
-        uuid.uuid4()
-    )
+    job_id = str(uuid.uuid4())
 
-    logger.info(
-        f"Starting financial analysis "
-        f"(job_id={job_id}, "
-        f"query={payload.query})"
-    )
+    logger.info(f"Starting financial analysis " f"(job_id={job_id}, " f"query={payload.query})")
 
-    query_id = (
-        await create_financial_query(
-            payload.query,
-            job_id,
-        )
+    query_id = await create_financial_query(
+        payload.query,
+        job_id,
     )
 
     background_tasks.add_task(
@@ -70,50 +57,27 @@ async def financial(
         job_id,
     )
 
-    return {
-        "jobId": job_id
-    }
+    return {"jobId": job_id}
 
 
-@router.get(
-    "/financial-result/{job_id}"
-)
+@router.get("/financial-result/{job_id}")
 async def get_financial_result(
     job_id: str,
 ):
-    data = (
-        await get_full_financial_result(
-            job_id
-        )
-    )
+    data = await get_full_financial_result(job_id)
 
     if not data:
-        raise ClaimNotFoundError(
-            job_id
-        )
+        raise ClaimNotFoundError(job_id)
 
-    status = data.get(
-        "status"
-    )
+    status = data.get("status")
 
-    if (
-        status
-        == STATUS_PROCESSING
-    ):
-        progress = (
-            await get_progress(
-                job_id
-            )
-        )
+    if status == STATUS_PROCESSING:
+        progress = await get_progress(job_id)
 
         return {
-            "status":
-                "processing",
-            "jobId":
-                job_id,
-            "progress":
-                progress
-                or "Fetching market data...",
+            "status": "processing",
+            "jobId": job_id,
+            "progress": progress or "Fetching market data...",
         }
 
     return data

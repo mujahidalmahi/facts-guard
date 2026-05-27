@@ -27,5 +27,5 @@ def parse_json_response(text: str) -> Any:
     Raises json.JSONDecodeError if parsing fails after cleanup.
     """
     cleaned = strip_scratchpad(text)
-    cleaned = re.sub(r'```(?:json)?', '', cleaned).strip()
+    cleaned = re.sub(r"```(?:json)?", "", cleaned).strip()
     return json.loads(cleaned)

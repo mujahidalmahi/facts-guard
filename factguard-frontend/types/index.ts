@@ -243,3 +243,33 @@ export interface CartResult {
   listings: CartListingEntry[];
   analysis: CartAnalysis;
 }
+
+// =========================
+// History Types
+// =========================
+export interface HistoryItem {
+  jobId: string;
+  mode: AppMode;
+  query: string;
+  verdict?: string;
+  signal?: string;
+  severity?: Severity;
+  createdAt: string;
+  display_text?: string;
+  claim?: string;
+  status?: string;
+}
+
+export interface ModeMeta {
+  label: string;
+  sublabel: string;
+  color: string;
+  icon: string;
+}
+
+export const MODE_META: Record<AppMode, ModeMeta> = {
+  verify: { label: 'Verify', sublabel: 'Fact Intelligence', color: '#4F46E5', icon: 'shield' },
+  financial: { label: 'Financial', sublabel: 'Market Signals', color: '#7C3AED', icon: 'trending' },
+  security: { label: 'Security', sublabel: 'Threat Surface', color: '#F59E0B', icon: 'alert' },
+  cart: { label: 'Cart', sublabel: 'Price Trust', color: '#06B6D4', icon: 'cart' },
+};

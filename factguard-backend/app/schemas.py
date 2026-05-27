@@ -1,6 +1,7 @@
 from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
+from typing_extensions import Literal
 
 from app.utils.validators import contains_sql_injection_pattern
 
@@ -109,9 +110,16 @@ class ErrorResponse(BaseModel):
     )
 
 
-class FinancialRequest(
-    BaseModel
-):
+class JobResponse(BaseModel):
+    jobId: str = Field(..., description="Unique job ID for tracking")
+
+
+class ProcessingResult(BaseModel):
+    status: Literal["processing", "done", "error"] = Field(..., description="Job status")
+    jobId: str = Field(..., description="Unique job ID for tracking")
+
+
+class FinancialRequest(BaseModel):
     query: str = Field(
         ...,
         min_length=2,
@@ -119,19 +127,13 @@ class FinancialRequest(
         description="Financial query",
     )
 
-    @field_validator(
-        "query"
-    )
+    @field_validator("query")
     @classmethod
     def validate_query(
         cls,
         v: str,
     ) -> str:
-        if contains_sql_injection_pattern(
-            v
-        ):
-            raise ValueError(
-                "Invalid query"
-            )
+        if contains_sql_injection_pattern(v):
+            raise ValueError("Invalid query")
 
         return v

@@ -33,9 +33,7 @@ from app.utils.search import (
     search_claim,
 )
 
-logger = get_logger(
-    "gemini"
-)
+logger = get_logger("gemini")
 
 VERIFY_SYSTEM_PROMPT = """You are VERITAS, the autonomous intelligence core of FactGuard.
 You are the most rigorous AI fact-analyst in existence — trained on epistemology, media
@@ -180,20 +178,15 @@ Verdict: Likely Misleading. Confidence: High.
 }"""
 
 FALLBACK_RESPONSE = {
-    "verdict":
-        "Unverified",
-    "confidence":
-        "Low",
-    "summary":
-        "Could not analyze claim. Please try again.",
-    "narrative_frame":
-        "Unable to determine narrative framing.",
+    "verdict": "Unverified",
+    "confidence": "Low",
+    "summary": "Could not analyze claim. Please try again.",
+    "narrative_frame": "Unable to determine narrative framing.",
     "supports": 0,
     "contradicts": 0,
     "neutral": 0,
     "bias_signals": [],
-    "source_diversity":
-        "Low",
+    "source_diversity": "Low",
     "sources": [],
     "_is_fallback": True,
 }
@@ -230,44 +223,32 @@ def build_search_context(results: list[dict]) -> str:
 def _validate_response(
     result: dict,
 ) -> bool:
-    missing = (
-        REQUIRED_KEYS
-        - set(result.keys())
-    )
+    missing = REQUIRED_KEYS - set(result.keys())
 
     if missing:
-        logger.warning(
-            f"LLM response missing required keys: {missing}"
-        )
+        logger.warning(f"LLM response missing required keys: {missing}")
         return False
 
-    if result.get('verdict') not in VALID_VERDICTS:
-        logger.warning(
-            f"Invalid verdict: {result.get('verdict')}"
-        )
+    if result.get("verdict") not in VALID_VERDICTS:
+        logger.warning(f"Invalid verdict: {result.get('verdict')}")
         return False
 
-    if result.get('confidence') not in VALID_CONFIDENCES:
-        logger.warning(
-            f"Invalid confidence: {result.get('confidence')}"
-        )
+    if result.get("confidence") not in VALID_CONFIDENCES:
+        logger.warning(f"Invalid confidence: {result.get('confidence')}")
         return False
 
-    for src in result.get('sources', []):
-        if src.get('stance') not in VALID_STANCES:
-            src['stance'] = 'neutral'
+    for src in result.get("sources", []):
+        if src.get("stance") not in VALID_STANCES:
+            src["stance"] = "neutral"
 
     return True
 
 
 async def analyze_claim(
     claim: str,
-    job_id:
-    str | None = None,
+    job_id: str | None = None,
 ) -> dict:
-    today = datetime.now(
-        timezone.utc
-    ).strftime("%Y-%m-%d")
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     if job_id:
         await set_progress(
@@ -275,17 +256,9 @@ async def analyze_claim(
             "Searching via Bright Data...",
         )
 
-    search_results = (
-        await search_claim(
-            claim
-        )
-    )
+    search_results = await search_claim(claim)
 
-    search_context_block = (
-        build_search_context(
-            search_results
-        )
-    )
+    search_context_block = build_search_context(search_results)
 
     user_prompt = VERIFY_USER_PROMPT.format(
         today=today,
@@ -293,17 +266,11 @@ async def analyze_claim(
         search_context_block=search_context_block,
     )
 
-    gemini_service = (
-        get_gemini_service()
-    )
+    gemini_service = get_gemini_service()
 
-    max_retries = len(
-        gemini_service.api_keys
-    )
+    max_retries = len(gemini_service.api_keys)
 
-    for attempt in range(
-        max_retries
-    ):
+    for attempt in range(max_retries):
         try:
             if job_id:
                 await set_progress(
@@ -311,23 +278,18 @@ async def analyze_claim(
                     "Analysing with AI...",
                 )
 
-            model = (
-                gemini_service.get_model()
-            )
+            model = gemini_service.get_model()
 
-            response = (
-                await asyncio.wait_for(
-                    asyncio.to_thread(
-                        model.generate_content,
-                        user_prompt,
-                    ),
-                    timeout=30.0,
-                )
+            response = await asyncio.wait_for(
+                asyncio.to_thread(
+                    model.generate_content,
+                    user_prompt,
+                ),
+                timeout=30.0,
             )
 
             text = (
-                response.text
-                .replace(
+                response.text.replace(
                     "```json",
                     "",
                 )
@@ -340,63 +302,40 @@ async def analyze_claim(
 
             text = strip_scratchpad(text)
 
-            result = json.loads(
-                text
-            )
+            result = json.loads(text)
 
-            original_urls = {
-                r["url"]
-                for r in search_results
-                if r.get("url")
-            }
+            original_urls = {r["url"] for r in search_results if r.get("url")}
             if original_urls:
-                result["sources"] = (
-                    validate_source_urls(
-                        result.get(
-                            "sources",
-                            [],
-                        ),
-                        original_urls,
-                    )
+                result["sources"] = validate_source_urls(
+                    result.get(
+                        "sources",
+                        [],
+                    ),
+                    original_urls,
                 )
 
-            if not _validate_response(
-                result
-            ):
-                return dict(
-                    FALLBACK_RESPONSE
-                )
+            if not _validate_response(result):
+                return dict(FALLBACK_RESPONSE)
 
-            logger.info(
-                "Claim analysis completed successfully"
-            )
+            logger.info("Claim analysis completed successfully")
 
             return result
 
         except asyncio.TimeoutError:
-            logger.warning(
-                f"Gemini timeout on attempt {attempt + 1}"
-            )
+            logger.warning(f"Gemini timeout on attempt {attempt + 1}")
 
-            remaining = (
-                max_retries
-                - attempt
-                - 1
-            )
+            remaining = max_retries - attempt - 1
 
             if remaining > 0:
                 gemini_service.rotate_key()
 
-                await asyncio.sleep(
-                    1
-                )
+                await asyncio.sleep(1)
 
                 continue
 
             return {
                 **FALLBACK_RESPONSE,
-                "summary":
-                    "AI analysis timed out.",
+                "summary": "AI analysis timed out.",
             }
 
         except (
@@ -404,11 +343,7 @@ async def analyze_claim(
             InternalServerError,
             ServiceUnavailable,
         ):
-            remaining = (
-                max_retries
-                - attempt
-                - 1
-            )
+            remaining = max_retries - attempt - 1
 
             logger.warning(
                 f"Gemini API key exhausted "
@@ -419,44 +354,28 @@ async def analyze_claim(
             if remaining > 0:
                 gemini_service.rotate_key()
 
-                await asyncio.sleep(
-                    1
-                )
+                await asyncio.sleep(1)
 
             continue
 
         except json.JSONDecodeError as e:
-            logger.warning(
-                f"JSON parsing failed: {str(e)}"
-            )
+            logger.warning(f"JSON parsing failed: {str(e)}")
 
-            remaining = (
-                max_retries
-                - attempt
-                - 1
-            )
+            remaining = max_retries - attempt - 1
 
             if remaining > 0:
                 gemini_service.rotate_key()
 
-                await asyncio.sleep(
-                    1
-                )
+                await asyncio.sleep(1)
 
             continue
 
         except Exception as e:
-            logger.error(
-                f"Unexpected error during analysis: {str(e)}"
-            )
+            logger.error(f"Unexpected error during analysis: {str(e)}")
 
-            return dict(
-                FALLBACK_RESPONSE
-            )
+            return dict(FALLBACK_RESPONSE)
 
-    logger.error(
-        "All Gemini API key retries exhausted"
-    )
+    logger.error("All Gemini API key retries exhausted")
 
     # Fallback to Groq
     try:
@@ -476,53 +395,30 @@ async def analyze_claim(
             max_tokens=1200,
         )
 
-        raw = (
-            raw.replace(
-                "```json", ""
-            )
-            .replace("```", "")
-            .strip()
-        )
+        raw = raw.replace("```json", "").replace("```", "").strip()
 
         raw = strip_scratchpad(raw)
 
         result = json.loads(raw)
 
-        original_urls = {
-            r["url"]
-            for r in search_results
-            if r.get("url")
-        }
+        original_urls = {r["url"] for r in search_results if r.get("url")}
         if original_urls:
-            result["sources"] = (
-                validate_source_urls(
-                    result.get(
-                        "sources", []
-                    ),
-                    original_urls,
-                )
+            result["sources"] = validate_source_urls(
+                result.get("sources", []),
+                original_urls,
             )
 
-        if not _validate_response(
-            result
-        ):
-            return dict(
-                FALLBACK_RESPONSE
-            )
+        if not _validate_response(result):
+            return dict(FALLBACK_RESPONSE)
 
         result["_provider"] = "groq"
-        logger.info(
-            "Claim analysis completed via Groq fallback"
-        )
+        logger.info("Claim analysis completed via Groq fallback")
         return result
 
     except Exception as groq_err:
-        logger.error(
-            f"Groq fallback also failed: {groq_err}"
-        )
+        logger.error(f"Groq fallback also failed: {groq_err}")
 
     return {
         **FALLBACK_RESPONSE,
-        "summary":
-            "All AI providers exhausted. Please try again later.",
+        "summary": "All AI providers exhausted. Please try again later.",
     }

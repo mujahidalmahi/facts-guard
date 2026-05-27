@@ -39,11 +39,14 @@ def _source_to_response(s: Any) -> dict:
 
 async def create_claim(claim_text: str, job_id: str) -> str:
     try:
-        result = await insert("claims", {
-            "claim_text": claim_text,
-            "job_id": job_id,
-            "status": STATUS_PROCESSING,
-        })
+        result = await insert(
+            "claims",
+            {
+                "claim_text": claim_text,
+                "job_id": job_id,
+                "status": STATUS_PROCESSING,
+            },
+        )
         claim_id = result.data[0]["id"]
         logger.debug(f"Claim created: {claim_id}")
         return claim_id
@@ -91,7 +94,9 @@ async def update_claim_status(claim_id: str, status: str):
 
 async def get_full_result(job_id: str) -> dict[str, Any] | None:
     try:
-        claim_response = await select("claims", eq_field="job_id", eq_value=job_id, maybe_single=True)
+        claim_response = await select(
+            "claims", eq_field="job_id", eq_value=job_id, maybe_single=True
+        )
     except Exception as e:
         logger.error(f"Failed to query claim for job_id {job_id}: {type(e).__name__}: {e}")
         return None
@@ -109,7 +114,9 @@ async def get_full_result(job_id: str) -> dict[str, Any] | None:
     status = claim.get("status", "processing")
 
     try:
-        result_response = await select("results", eq_field="claim_id", eq_value=claim_id, maybe_single=True)
+        result_response = await select(
+            "results", eq_field="claim_id", eq_value=claim_id, maybe_single=True
+        )
     except Exception as e:
         logger.error(f"Failed to query result for claim {claim_id}: {type(e).__name__}: {e}")
         return None
@@ -161,9 +168,7 @@ async def get_result_by_job_id(job_id: str) -> dict | None:
             return response.data[0]
         return None
     except Exception as e:
-        logger.warning(
-            f"get_result_by_job_id({job_id}): {e}"
-        )
+        logger.warning(f"get_result_by_job_id({job_id}): {e}")
         return None
 
 
@@ -179,9 +184,7 @@ async def get_claim_by_job_id(job_id: str) -> dict | None:
             return response.data[0]
         return None
     except Exception as e:
-        logger.warning(
-            f"get_claim_by_job_id({job_id}): {e}"
-        )
+        logger.warning(f"get_claim_by_job_id({job_id}): {e}")
         return None
 
 
@@ -215,9 +218,12 @@ async def get_recent_results(limit: int = 10, offset: int = 0) -> list[dict[str,
         range_end=offset + limit - 1,
     )
     return response.data or []
+
+
 # -------------------------
 # Financial Persistence
 # -------------------------
+
 
 async def save_financial_result(
     job_id: str,
@@ -228,25 +234,16 @@ async def save_financial_result(
         await insert(
             "financial_results",
             {
-                "job_id":
-                    job_id,
-
-                "query":
-                    query,
-
-                "result":
-                    data,
+                "job_id": job_id,
+                "query": query,
+                "result": data,
             },
         )
 
-        logger.debug(
-            f"Financial result saved: {job_id}"
-        )
+        logger.debug(f"Financial result saved: {job_id}")
 
     except Exception as e:
-        logger.error(
-            f"Failed to save financial result: {e}"
-        )
+        logger.error(f"Failed to save financial result: {e}")
 
 
 async def get_saved_financial_result(
@@ -255,24 +252,15 @@ async def get_saved_financial_result(
     try:
         response = await select(
             "financial_results",
-            eq_field=
-                "job_id",
-            eq_value=
-                job_id,
-            maybe_single=
-                True,
+            eq_field="job_id",
+            eq_value=job_id,
+            maybe_single=True,
         )
 
-        return (
-            response.data
-            if response
-            else None
-        )
+        return response.data if response else None
 
     except Exception as e:
-        logger.error(
-            f"Financial fetch failed: {e}"
-        )
+        logger.error(f"Financial fetch failed: {e}")
 
         return None
 
@@ -280,6 +268,7 @@ async def get_saved_financial_result(
 # -------------------------
 # Cart Persistence
 # -------------------------
+
 
 async def save_cart_result(
     job_id: str,
@@ -290,25 +279,16 @@ async def save_cart_result(
         await insert(
             "cart_results",
             {
-                "job_id":
-                    job_id,
-
-                "product":
-                    product,
-
-                "result":
-                    data,
+                "job_id": job_id,
+                "product": product,
+                "result": data,
             },
         )
 
-        logger.debug(
-            f"Cart result saved: {job_id}"
-        )
+        logger.debug(f"Cart result saved: {job_id}")
 
     except Exception as e:
-        logger.error(
-            f"Failed to save cart result: {e}"
-        )
+        logger.error(f"Failed to save cart result: {e}")
 
 
 async def get_saved_cart_result(
@@ -317,23 +297,14 @@ async def get_saved_cart_result(
     try:
         response = await select(
             "cart_results",
-            eq_field=
-                "job_id",
-            eq_value=
-                job_id,
-            maybe_single=
-                True,
+            eq_field="job_id",
+            eq_value=job_id,
+            maybe_single=True,
         )
 
-        return (
-            response.data
-            if response
-            else None
-        )
+        return response.data if response else None
 
     except Exception as e:
-        logger.error(
-            f"Cart fetch failed: {e}"
-        )
+        logger.error(f"Cart fetch failed: {e}")
 
         return None

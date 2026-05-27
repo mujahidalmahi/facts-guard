@@ -46,7 +46,7 @@ export function PriceCheckSection() {
       const data = await res.json();
       const jobId = data.jobId || 'demo';
 
-      router.push(`/price-loading?job=${jobId}`);
+      router.push(`/loading?mode=cart&job=${jobId}`);
     } catch (error) {
       console.error(error);
       alert('Failed to compare prices');

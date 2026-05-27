@@ -24,16 +24,19 @@ class AuditMiddleware(BaseHTTPMiddleware):
             return response
 
         try:
-            await insert("audit_logs", {
-                "id": str(uuid.uuid4()),
-                "user_id": request.headers.get("x-user-id"),
-                "action": f"{request.method} {request.url.path}",
-                "api_endpoint": request.url.path,
-                "request_body": body if body else None,
-                "response_status": response.status_code,
-                "ip_address": request.client.host if request.client else None,
-                "user_agent": request.headers.get("user-agent"),
-            })
+            await insert(
+                "audit_logs",
+                {
+                    "id": str(uuid.uuid4()),
+                    "user_id": request.headers.get("x-user-id"),
+                    "action": f"{request.method} {request.url.path}",
+                    "api_endpoint": request.url.path,
+                    "request_body": body if body else None,
+                    "response_status": response.status_code,
+                    "ip_address": request.client.host if request.client else None,
+                    "user_agent": request.headers.get("user-agent"),
+                },
+            )
         except Exception as e:
             logger.warning(f"Failed to write audit log: {e}")
 

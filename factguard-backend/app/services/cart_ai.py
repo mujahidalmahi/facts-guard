@@ -63,13 +63,13 @@ Analyse these listings and return the JSON enrichment."""
 def format_listings_table(listings: list[dict]) -> str:
     rows = []
     for i, listing in enumerate(listings):
-        price = f"${listing['price']:.2f}" if listing.get('price') else 'N/A'
+        price = f"${listing['price']:.2f}" if listing.get("price") else "N/A"
         rows.append(
             f"{i} | {listing.get('title','')[:60]} | {price} | "
             f"{listing.get('merchant','?')} | {listing.get('url','')[:50]} | "
             f"{listing.get('condition') or 'New'}"
         )
-    return '\n'.join(rows)
+    return "\n".join(rows)
 
 
 async def enrich_cart_listings(
@@ -97,9 +97,7 @@ async def enrich_cart_listings(
             "Running AI price analysis...",
         )
 
-    today = datetime.now(
-        timezone.utc
-    ).strftime("%Y-%m-%d")
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     listings_table = format_listings_table(listings)
     user_prompt = CART_USER_PROMPT.format(
@@ -113,6 +111,7 @@ async def enrich_cart_listings(
         model = gemini_service.get_model()
 
         import asyncio
+
         response = await asyncio.wait_for(
             asyncio.to_thread(
                 model.generate_content,
@@ -121,33 +120,20 @@ async def enrich_cart_listings(
             timeout=15.0,
         )
 
-        text = (
-            response.text
-            .replace("```json", "")
-            .replace("```", "")
-            .strip()
-        )
+        text = response.text.replace("```json", "").replace("```", "").strip()
 
         result = json.loads(text)
-        logger.info(
-            f"Cart AI enrichment completed: "
-            f"{result.get('verdict', 'unknown')}"
-        )
+        logger.info(f"Cart AI enrichment completed: " f"{result.get('verdict', 'unknown')}")
         return result
 
     except Exception as e:
-        logger.warning(
-            f"Cart AI enrichment failed: {e}"
-        )
+        logger.warning(f"Cart AI enrichment failed: {e}")
         return {
             "best_deal": None,
             "price_range": None,
             "market_average": None,
             "warnings": [],
             "variant_notes": None,
-            "recommendation": (
-                f"Found {len(listings)} listings. "
-                "Compare prices manually."
-            ),
+            "recommendation": (f"Found {len(listings)} listings. " "Compare prices manually."),
             "verdict": "Best deal found",
         }

@@ -1,113 +1,137 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ModeSwitcher } from '@/components/ModeSwitcher';
+import { Shield, TrendingUp, AlertTriangle, ShoppingCart, Send, AlertCircle, X, Sparkles } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import SplashScreen from '@/components/SplashScreen';
 import type { AppMode } from '@/types';
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  'http://localhost:8000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-const MODE_CFG = {
+const MODE_CONFIG: Record<
+  AppMode,
+  {
+    heading: string;
+    subtitle: string;
+    icon: LucideIcon;
+    placeholder: string;
+    buttonLabel: string;
+    buttonColor: string;
+    endpoint: string;
+    field: string;
+    maxLength: number;
+    examples: string[];
+  }
+> = {
   verify: {
-    headline: 'FactGuard',
-    sub: 'AI-powered trust verification in under 60 seconds',
-    placeholder:
-      'Enter a claim, headline, or statement to verify...',
-    cta: 'Analyse Claim',
+    heading: 'Intelligence Verification',
+    subtitle: 'VERITAS reasoning engine · v5.1',
+    icon: Shield,
+    placeholder: 'Enter a claim, statement, or news headline to verify...',
+    buttonLabel: 'Analyse Claim',
+    buttonColor: '#4F46E5',
     endpoint: '/verify',
     field: 'claim',
+    maxLength: 2000,
     examples: [
-      'The Earth is flat',
       'WHO confirmed ivermectin cures COVID-19',
-      'Apple is acquiring Netflix',
+      'Apple is acquiring Netflix at $95B',
+      'mRNA vaccines alter human DNA permanently',
     ],
   },
-
   financial: {
-    headline: 'Market Intel',
-    sub: 'Real-time price analysis, signals & market prediction',
-    placeholder:
-      'Dollar rate today | Oil price trend | TSLA stock outlook...',
-    cta: 'Analyse Market',
+    heading: 'Market Signal Analysis',
+    subtitle: 'Real-time market telemetry · yFinance + BrightData',
+    icon: TrendingUp,
+    placeholder: 'Enter an asset, ticker, or market question...',
+    buttonLabel: 'Analyse Market',
+    buttonColor: '#7C3AED',
     endpoint: '/financial',
     field: 'query',
+    maxLength: 500,
     examples: [
-      'Dollar to BDT rate',
-      'Crude oil price trend',
-      'Bitcoin 30-day',
+      'Bitcoin 30-day trend and outlook',
+      'Crude oil price vs USD correlation',
+      'TSLA Q4 earnings impact forecast',
     ],
   },
-
-  cart: {
-    headline: 'CartGuard',
-    sub: 'Compare prices · Green = trusted · Red = risky',
-    placeholder:
-      'iPhone 16 Pro 256GB | Sony WH-1000XM5 | RTX 5090...',
-    cta: 'Compare Prices',
-    endpoint: '/cart',
-    field: 'product',
-    examples: [
-      'iPhone 16 Pro',
-      'Sony WH-1000XM5',
-      'RTX 5090 GPU',
-    ],
-  },
-
   security: {
-    headline: 'ThreatGuard',
-    sub: 'Real-time brand, regulatory & vendor threat monitoring',
-    placeholder:
-      'Data breach | compliance update | disinformation campaign...',
-    cta: 'Scan Threats',
+    heading: 'Threat Surface Scan',
+    subtitle: 'ThreatGuard engine · 10+ news domains monitored',
+    icon: AlertTriangle,
+    placeholder: 'Enter a company, brand, or sector to scan for threats...',
+    buttonLabel: 'Scan Threats',
+    buttonColor: '#F59E0B',
     endpoint: '/threats/scan',
     field: 'query',
+    maxLength: 500,
     examples: [
-      'Data breach at key vendor',
-      'New GDPR compliance requirement',
-      'Disinformation campaign targeting financial sector',
+      'Data breach at cloud storage vendor',
+      'New SEC cybersecurity disclosure rule',
+      'Disinformation targeting fintech sector',
     ],
   },
-} satisfies Record<AppMode, object>;
+  cart: {
+    heading: 'Price Trust Analysis',
+    subtitle: 'CartGuard engine · counterfeit risk detection',
+    icon: ShoppingCart,
+    placeholder: 'Enter a product name or model number...',
+    buttonLabel: 'Compare Prices',
+    buttonColor: '#06B6D4',
+    endpoint: '/cart',
+    field: 'product',
+    maxLength: 500,
+    examples: [
+      'iPhone 16 Pro 256GB',
+      'Sony WH-1000XM5 headphones',
+      'RTX 5090 GPU best price',
+    ],
+  },
+};
 
 export default function HomePage() {
-  const [mode, setMode] =
-    useState<AppMode>('verify');
+  const searchParams = useSearchParams();
+  const modeParam = searchParams.get('mode') as AppMode | null;
+  const mode: AppMode = modeParam || 'verify';
 
-  const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [showSplash, setShowSplash] =
-    useState(false);
+    useState(() => !sessionStorage.getItem('splashShown'));
+  const [query, setQuery] = useState('');
 
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const router = useRouter();
 
-  const cfg =
-    MODE_CFG[mode] as typeof MODE_CFG['verify'];
-
-  useEffect(() => {
-    if (!sessionStorage.getItem('splashShown')) {
-      setShowSplash(true);
-    }
-  }, []);
+  const config = MODE_CONFIG[mode];
+  const Icon = config.icon;
 
   async function handleSubmit() {
-    if (!input.trim()) return;
+    const value = inputRef.current?.value.trim();
+    if (!value) {
+      setError('Please enter a query to analyse.');
+      return;
+    }
+    if (value.length > config.maxLength) {
+      setError(`Query exceeds ${config.maxLength} character limit.`);
+      return;
+    }
 
+    setError(null);
     setLoading(true);
 
     try {
       const res = await fetch(
-        `${API_URL}${cfg.endpoint}`,
+        `${API_URL}${config.endpoint}`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            [cfg.field]: input,
+            [config.field]: value,
           }),
         }
       );
@@ -121,129 +145,224 @@ export default function HomePage() {
         `/loading?job=${data.jobId}&mode=${mode}`
       );
     } catch {
-      alert('Failed — is the backend running?');
+      setError('Analysis failed — is the backend running?');
     } finally {
       setLoading(false);
     }
   }
 
+  const handleExampleClick = (example: string) => {
+    setQuery(example);
+    if (inputRef.current) {
+      inputRef.current.value = example;
+    }
+    setError(null);
+  };
+
+  // Cmd+Enter to submit
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault();
+      handleSubmit();
+    }
+  };
+
   if (showSplash)
     return (
       <SplashScreen
         onDone={() => {
-          sessionStorage.setItem(
-            'splashShown',
-            '1'
-          );
+          sessionStorage.setItem('splashShown', '1');
           setShowSplash(false);
         }}
       />
     );
 
   return (
-    <main
-      className='min-h-[calc(100vh-3.5rem)]
-      flex flex-col items-center justify-center
-      px-6 bg-[var(--background)]'
+    <div className="relative min-h-screen flex items-center justify-center p-6 overflow-hidden"
+      style={{ backgroundColor: 'var(--color-bg-base)' }}
     >
-      <div className='max-w-3xl w-full text-center space-y-6'>
-        <div className='relative text-center space-y-4'>
-          <motion.div
-            key={mode}
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className='inline-flex items-center gap-2 px-4 py-1.5 rounded-full
-              border border-indigo-500/30 bg-indigo-500/10 text-indigo-300 text-xs
-              font-semibold tracking-widest uppercase'
-          >
-            <span className='w-1.5 h-1.5 rounded-full bg-indigo-400 pulse-ring' />
-            {mode === 'verify'
-              ? 'AI Fact Intelligence'
-              : mode === 'financial'
-              ? 'Live Market Oracle'
-              : mode === 'security'
-              ? 'Real-Time Threat Monitor'
-              : 'Price Trust Engine'}
-          </motion.div>
+      {/* Background orbs */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+        <div
+          className="absolute -top-40 -left-40 w-[500px] h-[500px] rounded-full blur-[120px] opacity-30"
+          style={{ backgroundColor: config.buttonColor }}
+        />
+        <div
+          className="absolute -bottom-40 -right-40 w-[500px] h-[500px] rounded-full blur-[120px] opacity-20"
+          style={{ backgroundColor: '#06B6D4' }}
+        />
+        <div className="absolute inset-0 animated-grid opacity-40" />
+      </div>
 
-          <motion.h1
-            key={`title-${mode}`}
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.05 }}
-            className='text-5xl sm:text-7xl font-black tracking-tight'
+      <motion.div
+        key={mode}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+        className="relative z-10 w-full max-w-[760px]"
+      >
+        {/* Mode Header */}
+        <motion.div layoutId="mode-title" className="mb-10 text-center">
+          <div className="inline-flex items-center gap-2 mb-4 px-3 py-1 rounded-full"
+            style={{ backgroundColor: 'var(--color-bg-surface)', border: '1px solid var(--color-border-default)' }}
           >
-            <span className='gradient-text'>
-              {cfg.headline}
+            <Sparkles className="w-3.5 h-3.5" style={{ color: config.buttonColor }} />
+            <span className="data-label" style={{ color: config.buttonColor }}>
+              {mode.toUpperCase()} · MODE ACTIVE
             </span>
-          </motion.h1>
-
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.1 }}
-            className='text-slate-400 text-base sm:text-lg max-w-xl mx-auto'
-          >
-            {cfg.sub}
-          </motion.p>
-        </div>
-
-        <div className='flex justify-center'>
-          <ModeSwitcher
-            current={mode}
-            onChange={(m) => {
-              setMode(m);
-              setInput('');
+          </div>
+          <h1
+            className="text-4xl sm:text-5xl font-extrabold mb-3"
+            style={{
+              color: 'var(--color-text-primary)',
+              fontFamily: 'var(--font-sora)',
+              textShadow: `0 0 40px ${config.buttonColor}40`,
             }}
-          />
-        </div>
+          >
+            {config.heading}
+          </h1>
+          <p className="font-mono text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+            {config.subtitle}
+          </p>
+        </motion.div>
 
-        <div className='glass-card p-2 mt-2'>
-          <textarea
-            value={input}
-            onChange={(e) =>
-              setInput(e.target.value)
-            }
-            placeholder={cfg.placeholder}
-            className='w-full h-36 bg-transparent p-4 text-base
-              text-slate-100 placeholder-slate-500
-              outline-none resize-none'
-          />
-          <div className='flex items-center justify-between px-3 pb-2'>
-            <span className='text-xs text-slate-600'>
-              {input.length} chars
-            </span>
-            <button
-              onClick={handleSubmit}
-              disabled={loading}
-              className='btn-glow px-6 py-2.5 rounded-xl
-                text-white font-semibold text-sm
-                disabled:opacity-60'
-            >
-              {loading
-                ? '■ Analysing...'
-                : cfg.cta}
-            </button>
+        {/* Input Panel */}
+        <div className="rounded-2xl overflow-hidden"
+          style={{ backgroundColor: 'var(--color-bg-surface)', border: '1px solid var(--color-border-default)' }}
+        >
+          <div className="p-6" style={{ backgroundColor: 'rgba(15, 30, 53, 0.6)' }}>
+            {/* Top bar */}
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-8 h-8 rounded-lg flex items-center justify-center"
+                  style={{ backgroundColor: `${config.buttonColor}20`, color: config.buttonColor }}
+                >
+                  <Icon className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>{config.heading}</div>
+                  <div className="data-label flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 pulse-live" />
+                    Engine Ready
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Textarea */}
+            <textarea
+              ref={inputRef}
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setError(null);
+              }}
+              onKeyDown={handleKeyDown}
+              placeholder={config.placeholder}
+              className="w-full min-h-[160px] bg-transparent outline-none resize-none font-mono text-base leading-relaxed"
+              style={{ color: 'var(--color-text-primary)', caretColor: config.buttonColor }}
+              aria-label="Analysis query"
+            />
+
+            {/* Character counter + keyboard hint */}
+            <div className="flex items-center justify-between mb-4">
+              <div className="data-label">
+                {query.length} / {config.maxLength}
+              </div>
+              <div className="data-label flex items-center gap-1">
+                <kbd className="px-1 py-0.5 rounded border" style={{ borderColor: 'var(--color-border-default)' }}>⌘</kbd>
+                <span>+</span>
+                <kbd className="px-1 py-0.5 rounded border" style={{ borderColor: 'var(--color-border-default)' }}>↵</kbd>
+                <span className="ml-1">to submit</span>
+              </div>
+            </div>
+
+            {/* Bottom toolbar */}
+            <div className="flex items-center justify-between gap-3 flex-wrap pt-4 border-t border-[var(--color-border-subtle)]">
+              <div className="flex flex-wrap gap-2">
+                {config.examples.map((ex) => (
+                  <button
+                    key={ex}
+                    onClick={() => handleExampleClick(ex)}
+                    className="px-3 py-1.5 rounded-full text-xs border transition-colors"
+                    style={{
+                      color: 'var(--color-text-secondary)',
+                      borderColor: 'var(--color-border-subtle)',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = 'var(--color-border-default)';
+                      e.currentTarget.style.color = 'var(--color-text-primary)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = 'var(--color-border-subtle)';
+                      e.currentTarget.style.color = 'var(--color-text-secondary)';
+                    }}
+                  >
+                    {ex}
+                  </button>
+                ))}
+              </div>
+
+              <motion.button
+                onClick={handleSubmit}
+                disabled={loading}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm text-white transition-all disabled:opacity-50"
+                style={{
+                  backgroundColor: config.buttonColor,
+                  boxShadow: `0 0 20px ${config.buttonColor}40`,
+                }}
+              >
+                {loading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    {config.buttonLabel}
+                  </>
+                )}
+              </motion.button>
+            </div>
           </div>
         </div>
 
-        <div className='flex flex-wrap justify-center gap-3'>
-          {cfg.examples.map((ex) => (
+        {/* Error state */}
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-4 flex items-start gap-3 p-4 rounded-lg"
+            style={{ backgroundColor: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.2)' }}
+            role="alert"
+          >
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" style={{ color: 'var(--color-accent-red)' }} />
+            <div className="flex-1 text-sm" style={{ color: 'var(--color-accent-red)' }}>{error}</div>
             <button
-              key={ex}
-              onClick={() => setInput(ex)}
-              className='px-4 py-2 rounded-full
-              border border-[var(--card-border)]
-              text-sm text-[var(--muted-foreground)]
-              hover:bg-[var(--muted)]
-              hover:text-[var(--foreground)]
-              transition-colors'
+              onClick={() => setError(null)}
+              style={{ color: 'var(--color-accent-red)' }}
+              className="hover:opacity-70"
+              aria-label="Dismiss error"
             >
-              {ex}
+              <X className="w-4 h-4" />
             </button>
-          ))}
+          </motion.div>
+        )}
+
+        {/* Footer */}
+        <div className="mt-8 text-center">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[var(--color-border-subtle)]">
+            <div className="w-3 h-3 rounded-sm flex items-center justify-center" style={{ backgroundColor: '#4F46E520' }}>
+              <div className="w-1.5 h-1.5 rounded-sm" style={{ backgroundColor: '#4F46E5' }} />
+            </div>
+            <span className="data-label" style={{ color: 'var(--color-text-tertiary)' }}>Powered by BrightData MCP · Multi-agent reasoning</span>
+          </div>
         </div>
-      </div>
-    </main>
+      </motion.div>
+    </div>
   );
 }

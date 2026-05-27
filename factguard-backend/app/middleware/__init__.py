@@ -20,9 +20,7 @@ def _cors_response(status_code: int, content: dict) -> JSONResponse:
     return JSONResponse(status_code=status_code, content=content, headers=CORS_HEADERS)
 
 
-async def factguard_exception_handler(
-    request: Request, exc: FactGuardException
-):
+async def factguard_exception_handler(request: Request, exc: FactGuardException):
     logger.warning(
         f"FactGuard exception: {exc.error_code}",
     )
@@ -37,9 +35,7 @@ async def factguard_exception_handler(
     )
 
 
-async def validation_error_handler(
-    request: Request, exc: RequestValidationError
-):
+async def validation_error_handler(request: Request, exc: RequestValidationError):
     errors = []
     for error in exc.errors():
         errors.append(
@@ -62,9 +58,7 @@ async def validation_error_handler(
     )
 
 
-async def general_exception_handler(
-    request: Request, exc: Exception
-):
+async def general_exception_handler(request: Request, exc: Exception):
     logger.error(
         f"Unexpected error on {request.url.path}",
     )

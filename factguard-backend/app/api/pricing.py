@@ -29,35 +29,23 @@ from app.utils.constants import (
     STATUS_PROCESSING,
 )
 
-logger = get_logger(
-    "pricing"
-)
+logger = get_logger("pricing")
 
 router = APIRouter()
 
 
 @router.post("/cart")
 async def cart(
-    payload:
-    PriceCheckRequest,
-    background_tasks:
-    BackgroundTasks,
+    payload: PriceCheckRequest,
+    background_tasks: BackgroundTasks,
 ):
-    job_id = str(
-        uuid.uuid4()
-    )
+    job_id = str(uuid.uuid4())
 
-    logger.info(
-        f"Starting cart check "
-        f"(job_id: {job_id}, "
-        f"product: {payload.product})"
-    )
+    logger.info(f"Starting cart check " f"(job_id: {job_id}, " f"product: {payload.product})")
 
-    query_id = (
-        await create_query(
-            payload.product,
-            job_id,
-        )
+    query_id = await create_query(
+        payload.product,
+        job_id,
     )
 
     background_tasks.add_task(
@@ -67,18 +55,14 @@ async def cart(
         job_id,
     )
 
-    return {
-        "jobId": job_id
-    }
+    return {"jobId": job_id}
 
 
 # legacy compatibility
 @router.post("/price-check")
 async def price_check(
-    payload:
-    PriceCheckRequest,
-    background_tasks:
-    BackgroundTasks,
+    payload: PriceCheckRequest,
+    background_tasks: BackgroundTasks,
 ):
     return await cart(
         payload,
@@ -86,45 +70,24 @@ async def price_check(
     )
 
 
-@router.get(
-    "/price-result/{job_id}"
-)
+@router.get("/price-result/{job_id}")
 async def get_price_result(
     job_id: str,
 ):
-    data = (
-        await get_full_price_result(
-            job_id
-        )
-    )
+    data = await get_full_price_result(job_id)
 
     if not data:
-        raise ClaimNotFoundError(
-            job_id
-        )
+        raise ClaimNotFoundError(job_id)
 
-    status = data.get(
-        "status"
-    )
+    status = data.get("status")
 
-    if (
-        status
-        == STATUS_PROCESSING
-    ):
-        progress = (
-            await get_progress(
-                job_id
-            )
-        )
+    if status == STATUS_PROCESSING:
+        progress = await get_progress(job_id)
 
         return {
-            "status":
-                "processing",
-            "jobId":
-                job_id,
-            "progress":
-                progress
-                or PRICING_PROGRESS_SEARCHING,
+            "status": "processing",
+            "jobId": job_id,
+            "progress": progress or PRICING_PROGRESS_SEARCHING,
         }
 
     return data

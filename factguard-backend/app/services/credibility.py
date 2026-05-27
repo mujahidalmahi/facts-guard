@@ -29,16 +29,39 @@ Return the JSON array."""
 # Domain authority scoring — static heuristic
 HIGH_DOMAIN_KEYWORDS = [".gov", ".edu", ".mil", ".int"]
 HIGH_OUTLET_NAMES = [
-    "reuters", "ap.org", "apnews", "associated press",
-    "bbc", "bbc.com", "nytimes", "wsj", "ft.com",
-    "theguardian", "bloomberg", "npr", "washington post",
-    "wapo", "economist", "nature.com", "science.org",
-    "pnas.org", "nejm", "thelancet", "cell.com",
+    "reuters",
+    "ap.org",
+    "apnews",
+    "associated press",
+    "bbc",
+    "bbc.com",
+    "nytimes",
+    "wsj",
+    "ft.com",
+    "theguardian",
+    "bloomberg",
+    "npr",
+    "washington post",
+    "wapo",
+    "economist",
+    "nature.com",
+    "science.org",
+    "pnas.org",
+    "nejm",
+    "thelancet",
+    "cell.com",
 ]
 LOW_DOMAIN_KEYWORDS = [
-    ".blogspot", ".wordpress", ".medium.com",
-    "reddit", "twitter", "x.com", "facebook",
-    "tiktok", "instagram", "substack.com",
+    ".blogspot",
+    ".wordpress",
+    ".medium.com",
+    "reddit",
+    "twitter",
+    "x.com",
+    "facebook",
+    "tiktok",
+    "instagram",
+    "substack.com",
 ]
 
 
@@ -100,9 +123,7 @@ async def evaluate_source_credibility(
 
     sources_lines = []
     for i, s in enumerate(sources):
-        sources_lines.append(
-            f"[{i}] Title: {s.get('title', '')} | URL: {s.get('url', '')}"
-        )
+        sources_lines.append(f"[{i}] Title: {s.get('title', '')} | URL: {s.get('url', '')}")
     sources_list_str = "\n".join(sources_lines)
 
     user_prompt = CREDIBILITY_USER_PROMPT.format(
@@ -123,32 +144,20 @@ async def evaluate_source_credibility(
             timeout=10.0,
         )
 
-        text = (
-            response.text
-            .replace("```json", "")
-            .replace("```", "")
-            .strip()
-        )
+        text = response.text.replace("```json", "").replace("```", "").strip()
 
         ratings = json.loads(text)
 
         for rating in ratings:
             idx = rating.get("index")
             if idx is not None and idx < len(sources):
-                sources[idx]["credibility"] = (
-                    rating.get("credibility", "Medium")
-                )
-                sources[idx]["credibility_reason"] = (
-                    rating.get("reason", "")
-                )
+                sources[idx]["credibility"] = rating.get("credibility", "Medium")
+                sources[idx]["credibility_reason"] = rating.get("reason", "")
 
         return _enrich_with_scoring(sources)
 
     except Exception as e:
-        logger.warning(
-            f"Credibility AI evaluation failed: "
-            f"{e}, falling back to heuristic"
-        )
+        logger.warning(f"Credibility AI evaluation failed: " f"{e}, falling back to heuristic")
         sources = _heuristic_credibility(sources)
         return _enrich_with_scoring(sources)
 
@@ -159,7 +168,9 @@ def _enrich_with_scoring(sources: list[dict]) -> list[dict]:
         url = s.get("url", "")
         domain_score = _domain_authority_score(url)
         temporal_score = _temporal_freshness_score(s.get("date"))
-        base_score = {"High": 0.9, "Medium": 0.5, "Low": 0.2}.get(s.get("credibility", "Medium"), 0.5)
+        base_score = {"High": 0.9, "Medium": 0.5, "Low": 0.2}.get(
+            s.get("credibility", "Medium"), 0.5
+        )
         composite = (base_score * 0.4) + (domain_score * 0.35) + (temporal_score * 0.25)
 
         s["domain_authority_score"] = round(domain_score, 2)
@@ -192,48 +203,15 @@ def _heuristic_credibility(
             ]
         ):
             s["credibility"] = "High"
-            s["credibility_reason"] = (
-                "Government or educational domain."
-            )
-        elif any(
-            name in url or name in title
-            for name in [
-                "reuters",
-                "ap.org",
-                "apnews",
-                "bbc",
-                "nytimes",
-                "wsj",
-                "ft.com",
-                "theguardian",
-                "bloomberg",
-                "npr",
-            ]
-        ):
+            s["credibility_reason"] = "Government or educational domain."
+        elif any(name in url or name in title for name in HIGH_OUTLET_NAMES):
             s["credibility"] = "High"
-            s["credibility_reason"] = (
-                "Major news organisation."
-            )
-        elif any(
-            domain in url
-            for domain in [
-                ".blogspot",
-                ".wordpress",
-                ".medium.com",
-                "reddit",
-                "twitter",
-                "x.com",
-                "facebook",
-            ]
-        ):
+            s["credibility_reason"] = "Major news organisation."
+        elif any(domain in url for domain in LOW_DOMAIN_KEYWORDS):
             s["credibility"] = "Low"
-            s["credibility_reason"] = (
-                "Blog or social media platform."
-            )
+            s["credibility_reason"] = "Blog or social media platform."
         else:
             s["credibility"] = "Medium"
-            s["credibility_reason"] = (
-                "Standard web source."
-            )
+            s["credibility_reason"] = "Standard web source."
 
     return sources

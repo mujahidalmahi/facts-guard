@@ -35,9 +35,7 @@ from app.services.brightdata import (
 
 from app.utils.duckduckgo import search as ddg_search
 
-logger = get_logger(
-    "financial"
-)
+logger = get_logger("financial")
 
 
 async def create_financial_query(
@@ -84,10 +82,12 @@ def _try_yfinance_chart(query: str) -> dict | None:
                     price = row.get("Close")
                     if price is None:
                         continue
-                    points.append({
-                        "date": date.strftime("%Y-%m-%d"),
-                        "price": round(float(price), 2),
-                    })
+                    points.append(
+                        {
+                            "date": date.strftime("%Y-%m-%d"),
+                            "price": round(float(price), 2),
+                        }
+                    )
                 if not points:
                     return None
                 prices = [p["price"] for p in points]
@@ -110,9 +110,7 @@ async def process_financial_analysis(
     query: str,
     job_id: str,
 ):
-    logger.info(
-        f"Financial analysis started: {query}"
-    )
+    logger.info(f"Financial analysis started: {query}")
 
     try:
         await set_progress(
@@ -161,10 +159,7 @@ async def process_financial_analysis(
                 job_id,
                 "Extracting articles via browser...",
             )
-            top_urls = [
-                r["url"] for r in all_results[:5]
-                if r.get("url")
-            ]
+            top_urls = [r["url"] for r in all_results[:5] if r.get("url")]
             if top_urls:
                 extracted_list = await asyncio.gather(
                     *[browser_extract_text(url) for url in top_urls],
@@ -174,9 +169,7 @@ async def process_financial_analysis(
                     if isinstance(extracted, str) and extracted:
                         browser_texts[url] = extracted
                         search_context += (
-                            "\n\nFULL ARTICLE TEXT "
-                            f"(from {url}):\n"
-                            f"{extracted[:3000]}"
+                            "\n\nFULL ARTICLE TEXT " f"(from {url}):\n" f"{extracted[:3000]}"
                         )
 
         await set_progress(
@@ -207,14 +200,16 @@ async def process_financial_analysis(
                     source["extraction"] = "browser"
                 sources.append(source)
         else:
-            sources.append({
-                "title": "Web Search",
-                "url": "https://duckduckgo.com",
-                "credibility": "Medium",
-                "stance": ai_analysis.get("price_trend", "Neutral"),
-                "summary": "Analysis based on available data.",
-                "date": datetime.now().strftime("%Y-%m-%d"),
-            })
+            sources.append(
+                {
+                    "title": "Web Search",
+                    "url": "https://duckduckgo.com",
+                    "credibility": "Medium",
+                    "stance": ai_analysis.get("price_trend", "Neutral"),
+                    "summary": "Analysis based on available data.",
+                    "date": datetime.now().strftime("%Y-%m-%d"),
+                }
+            )
 
         result = {
             "mode": "financial",
@@ -228,12 +223,14 @@ async def process_financial_analysis(
 
         await save_financial_result(job_id, query, result)
 
-        await push_claim_to_history({
-            "jobId": job_id,
-            "claim": f"[FINANCIAL] {query}",
-            "status": STATUS_DONE,
-            "createdAt": datetime.now().isoformat(),
-        })
+        await push_claim_to_history(
+            {
+                "jobId": job_id,
+                "claim": f"[FINANCIAL] {query}",
+                "status": STATUS_DONE,
+                "createdAt": datetime.now().isoformat(),
+            }
+        )
 
         logger.info(f"Financial analysis completed: {job_id}")
 
@@ -262,20 +259,12 @@ async def process_financial_analysis(
 async def get_full_financial_result(
     job_id: str,
 ):
-    saved = (
-        await get_saved_financial_result(
-            job_id
-        )
-    )
+    saved = await get_saved_financial_result(job_id)
 
     if saved:
-        logger.info(
-            f"Financial result found: {job_id}"
-        )
+        logger.info(f"Financial result found: {job_id}")
 
-        return saved.get(
-            "result"
-        )
+        return saved.get("result")
 
     return {
         "status": "processing",

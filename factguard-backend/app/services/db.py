@@ -11,11 +11,36 @@ def _get_client():
     return get_supabase_service().get_client()
 
 
+_CONNECTION_ERRORS = (
+    "RemoteProtocolError",
+    "ConnectionClosed",
+    "ConnectError",
+    "ReadTimeout",
+    "WriteTimeout",
+)
+
+
 async def _db_call(callback):
     try:
         return await asyncio.to_thread(callback)
     except Exception as e:
-        logger.error(f"Database call failed: {type(e).__name__}: {e}")
+        err_type = type(e).__name__
+        logger.error(f"Database call failed: {err_type}: {e}")
+
+        if any(conn_err in err_type for conn_err in _CONNECTION_ERRORS):
+            logger.info("Recreating Supabase client and retrying...")
+            try:
+                get_supabase_service().reset_client()
+                return await asyncio.to_thread(callback)
+            except Exception as retry_e:
+                retry_type = type(retry_e).__name__
+                # The first call actually succeeded on the server if we get a
+                # duplicate-key violation on retry (the row was already written).
+                if retry_type == "APIError" and "23505" in str(retry_e):
+                    logger.warning(f"Duplicate key on retry — first call succeeded: {retry_e}")
+                    return None
+                logger.error(f"Retry also failed: {retry_type}: {retry_e}")
+
         raise
 
 
@@ -30,11 +55,17 @@ async def update(table: str, data: dict, eq_field: str, eq_value: str) -> Any:
 
 
 async def select(
-    table: str, fields: str = "*",
-    eq_field: str | None = None, eq_value: str | None = None,
-    maybe_single: bool = False, order: str | None = None, desc: bool = False,
-    limit: int | None = None, offset: int | None = None,
-    range_start: int | None = None, range_end: int | None = None,
+    table: str,
+    fields: str = "*",
+    eq_field: str | None = None,
+    eq_value: str | None = None,
+    maybe_single: bool = False,
+    order: str | None = None,
+    desc: bool = False,
+    limit: int | None = None,
+    offset: int | None = None,
+    range_start: int | None = None,
+    range_end: int | None = None,
 ) -> Any:
     def query():
         q = _get_client().table(table).select(fields)
@@ -51,4 +82,5 @@ async def select(
         if maybe_single:
             q = q.maybe_single()
         return q.execute()
+
     return await _db_call(query)

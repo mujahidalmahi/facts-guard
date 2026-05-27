@@ -118,21 +118,27 @@ async def serp_search(query: str, max_results: int = 8, engine: str = "google") 
             "format": "raw",
         }
         async with httpx.AsyncClient() as client:
-            resp = await client.post(BRIGHTDATA_ENDPOINT, json=payload, headers=_headers(), timeout=20)
+            resp = await client.post(
+                BRIGHTDATA_ENDPOINT, json=payload, headers=_headers(), timeout=20
+            )
             if not resp.is_success:
-                logger.warning(f"BrightData SERP ({engine}) error {resp.status_code}: {resp.text[:500]}")
+                logger.warning(
+                    f"BrightData SERP ({engine}) error {resp.status_code}: {resp.text[:500]}"
+                )
             resp.raise_for_status()
             data = resp.json()
 
         organic = data.get("organic", [])
         results = []
         for r in organic[:max_results]:
-            results.append({
-                "title": r.get("title", ""),
-                "url": r.get("link", r.get("url", "")),
-                "snippet": r.get("snippet", r.get("description", "")),
-                "source": source_label,
-            })
+            results.append(
+                {
+                    "title": r.get("title", ""),
+                    "url": r.get("link", r.get("url", "")),
+                    "snippet": r.get("snippet", r.get("description", "")),
+                    "source": source_label,
+                }
+            )
         logger.info(f"BrightData SERP ({engine}) returned {len(results)} results")
         return results
     except Exception as e:
@@ -159,7 +165,9 @@ async def crawl_extract(url: str) -> Optional[dict]:
             },
         }
         async with httpx.AsyncClient() as client:
-            resp = await client.post(BRIGHTDATA_ENDPOINT, json=payload, headers=_headers(), timeout=30)
+            resp = await client.post(
+                BRIGHTDATA_ENDPOINT, json=payload, headers=_headers(), timeout=30
+            )
             resp.raise_for_status()
             data = resp.json()
         result = {
@@ -189,7 +197,9 @@ async def unlocker_scrape(url: str) -> Optional[str]:
             "format": "raw",
         }
         async with httpx.AsyncClient() as client:
-            resp = await client.post(BRIGHTDATA_ENDPOINT, json=payload, headers=_headers(), timeout=30)
+            resp = await client.post(
+                BRIGHTDATA_ENDPOINT, json=payload, headers=_headers(), timeout=30
+            )
             resp.raise_for_status()
             text = resp.text[:5000]
         logger.info(f"Web Unlocker scraped: {url}")
@@ -210,9 +220,13 @@ async def browser_render(url: str) -> Optional[str]:
 
         async with async_playwright() as p:
             logger.info(f"Connecting to BrightData CDP...")
-            browser = await p.chromium.connect_over_cdp(wss_url, timeout=settings.BROWSER_TIMEOUT * 1000 + 5000)
+            browser = await p.chromium.connect_over_cdp(
+                wss_url, timeout=settings.BROWSER_TIMEOUT * 1000 + 5000
+            )
             page = await browser.new_page()
-            await page.goto(url, wait_until="domcontentloaded", timeout=settings.BROWSER_TIMEOUT * 1000)
+            await page.goto(
+                url, wait_until="domcontentloaded", timeout=settings.BROWSER_TIMEOUT * 1000
+            )
             body_text = await page.evaluate("() => document.body.innerText")
             await page.close()
             await browser.close()
@@ -277,7 +291,9 @@ async def mcp_discover(query: str) -> list[dict]:
             "max_results": 8,
         }
         async with httpx.AsyncClient() as client:
-            resp = await client.post(BRIGHTDATA_MCP_ENDPOINT, json=payload, headers=_headers(), timeout=20)
+            resp = await client.post(
+                BRIGHTDATA_MCP_ENDPOINT, json=payload, headers=_headers(), timeout=20
+            )
             resp.raise_for_status()
             data = resp.json()
         results = data.get("results", [])
@@ -301,7 +317,9 @@ async def proxy_request(url: str, country: str = "us") -> Optional[str]:
             "country": country,
         }
         async with httpx.AsyncClient() as client:
-            resp = await client.post(BRIGHTDATA_ENDPOINT, json=payload, headers=_headers(), timeout=30)
+            resp = await client.post(
+                BRIGHTDATA_ENDPOINT, json=payload, headers=_headers(), timeout=30
+            )
             resp.raise_for_status()
             text = resp.text[:5000]
         logger.info(f"Proxy request completed: {url} ({country})")

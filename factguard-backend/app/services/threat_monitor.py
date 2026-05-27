@@ -7,34 +7,78 @@ from app.utils.duckduckgo import search as _duckduckgo_search
 logger = get_logger("threat_monitor")
 
 TRUSTED_NEWS_DOMAINS = [
-    "reuters.com", "apnews.com", "bbc.com", "bbc.co.uk",
-    "nytimes.com", "wsj.com", "ft.com", "bloomberg.com",
-    "theguardian.com", "npr.org", "washingtonpost.com",
-    "economist.com", "cnbc.com", "republicworld.com",
-    "timesofindia.indiatimes.com", "thehindu.com",
+    "reuters.com",
+    "apnews.com",
+    "bbc.com",
+    "bbc.co.uk",
+    "nytimes.com",
+    "wsj.com",
+    "ft.com",
+    "bloomberg.com",
+    "theguardian.com",
+    "npr.org",
+    "washingtonpost.com",
+    "economist.com",
+    "cnbc.com",
+    "republicworld.com",
+    "timesofindia.indiatimes.com",
+    "thehindu.com",
 ]
 
 RISK_KEYWORDS = {
     "brand": [
-        "breach", "vulnerability", "ransomware", "data leak",
-        "cyber attack", "hacked", "security incident",
-        "product defect", "recall", "lawsuit", "fraud",
-        "scandal", "misconduct", "investigation",
+        "breach",
+        "vulnerability",
+        "ransomware",
+        "data leak",
+        "cyber attack",
+        "hacked",
+        "security incident",
+        "product defect",
+        "recall",
+        "lawsuit",
+        "fraud",
+        "scandal",
+        "misconduct",
+        "investigation",
     ],
     "regulatory": [
-        "regulation", "compliance", "fine", "penalty",
-        "regulatory", "SEC", "GDPR", "CCPA", "sanction",
-        "oversight", "legislation", "policy change",
+        "regulation",
+        "compliance",
+        "fine",
+        "penalty",
+        "regulatory",
+        "SEC",
+        "GDPR",
+        "CCPA",
+        "sanction",
+        "oversight",
+        "legislation",
+        "policy change",
     ],
     "vendor": [
-        "supplier", "vendor", "insolvency", "bankruptcy",
-        "layoff", "restructuring", "acquisition", "merger",
-        "downgrade", "default", "credit rating",
+        "supplier",
+        "vendor",
+        "insolvency",
+        "bankruptcy",
+        "layoff",
+        "restructuring",
+        "acquisition",
+        "merger",
+        "downgrade",
+        "default",
+        "credit rating",
     ],
     "disinformation": [
-        "misinformation", "disinformation", "fake news",
-        "deepfake", "coordinated", "bot network",
-        "propaganda", "false claim", "hoax",
+        "misinformation",
+        "disinformation",
+        "fake news",
+        "deepfake",
+        "coordinated",
+        "bot network",
+        "propaganda",
+        "false claim",
+        "hoax",
     ],
 }
 
@@ -131,15 +175,17 @@ async def generate_compliance_report(threats: list[dict]) -> str:
     ]
 
     for i, t in enumerate(threats, 1):
-        report_lines.extend([
-            f"--- Threat #{i} ---",
-            f"Type: {t.get('threat_type', 'unknown')}",
-            f"Severity: {t.get('severity', 'unknown')}",
-            f"Title: {t.get('title', 'N/A')}",
-            f"Source: {t.get('source_url', 'N/A')}",
-            f"Description: {t.get('description', 'N/A')}",
-            f"Confidence: {t.get('confidence', 0)}",
-            "",
-        ])
+        report_lines.extend(
+            [
+                f"--- Threat #{i} ---",
+                f"Type: {t.get('threat_type', 'unknown')}",
+                f"Severity: {t.get('severity', 'unknown')}",
+                f"Title: {t.get('title', 'N/A')}",
+                f"Source: {t.get('source_url', 'N/A')}",
+                f"Description: {t.get('description', 'N/A')}",
+                f"Confidence: {t.get('confidence', 0)}",
+                "",
+            ]
+        )
 
     return "\n".join(report_lines)

@@ -1,159 +1,290 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { PriceChart } from '@/components/PriceChart';
-import { SignalBadge } from '@/components/SignalBadge';
+import { Area, AreaChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, ArrowRight, AlertTriangle, CheckCircle2, ExternalLink, Activity } from 'lucide-react';
+import type { FinancialResult, FinancialSource } from '@/types';
 
-const RISK_COLOR: Record<string, string> = {
-  Low: 'text-emerald-500',
-  Medium: 'text-amber-500',
-  High: 'text-red-500',
-};
+function formatDate(d: string) {
+  const date = new Date(d);
+  return `${date.getMonth() + 1}/${date.getDate()}`;
+}
 
-const TREND_COLOR: Record<string, string> = {
-  Up: 'text-emerald-500',
-  Down: 'text-red-500',
-  Sideways: 'text-slate-400',
-};
+function formatPrice(p: number) {
+  if (p >= 1000) return `$${(p / 1000).toFixed(1)}k`;
+  return `$${p.toFixed(2)}`;
+}
 
-const FRESHNESS_COLOR: Record<string, string> = {
-  'real-time': 'text-emerald-400',
-  intraday: 'text-emerald-300',
-  daily: 'text-amber-400',
-  stale: 'text-red-400',
-};
+export function FinancialResultView({ data }: { data: FinancialResult }) {
+  const { graph_data, analysis } = data;
+  const isPositive = graph_data?.change_24h?.startsWith('+') ?? true;
+  const lineColor = isPositive ? '#10B981' : '#EF4444';
 
-export function FinancialResultView({
-  data,
-}: {
-  data: any;
-}) {
-  const a = data.analysis;
+  const avgPrice = graph_data?.data?.length
+    ? graph_data.data.reduce((sum, d) => sum + d.price, 0) / graph_data.data.length
+    : 0;
+
+  const signalColor = analysis.signal === 'Bullish' ? '#10B981' : analysis.signal === 'Bearish' ? '#EF4444' : '#F59E0B';
+  const SignalIcon = analysis.signal === 'Bullish' ? TrendingUp : analysis.signal === 'Bearish' ? TrendingDown : ArrowRight;
+  const TrendIcon = analysis.price_trend === 'Up' ? ArrowUpRight : analysis.price_trend === 'Down' ? ArrowDownRight : ArrowRight;
+  const trendColor = analysis.price_trend === 'Up' ? '#10B981' : analysis.price_trend === 'Down' ? '#EF4444' : '#F59E0B';
+  const riskColor = analysis.risk_level === 'Low' ? '#10B981' : analysis.risk_level === 'Medium' ? '#F59E0B' : '#EF4444';
+  const freshnessLive = analysis.data_freshness === 'real-time';
 
   return (
-    <main className='max-w-3xl mx-auto px-4 py-10 space-y-8'>
-      {/* Hero */}
-      <motion.div
-        className='flex flex-wrap items-center gap-3'
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-      >
-        <SignalBadge signal={a.signal} />
-
-        {a.signal_strength != null && (
-          <div className="relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20">
-            <svg className="w-6 h-6 -rotate-90" viewBox="0 0 36 36">
-              <circle cx="18" cy="18" r="15" fill="none" stroke="currentColor" strokeWidth="3" className="text-indigo-500/20" />
-              <circle cx="18" cy="18" r="15" fill="none" stroke="currentColor" strokeWidth="3"
-                strokeDasharray={`${(a.signal_strength / 100) * 94.2} 94.2`}
-                className="text-indigo-400" strokeLinecap="round" />
-            </svg>
-            <span className="text-xs font-bold font-mono text-indigo-300">{a.signal_strength}</span>
-          </div>
-        )}
-
-        <span className={`text-sm font-semibold ${TREND_COLOR[a.price_trend] || 'text-slate-400'}`}>
-          {a.price_trend} {a.trend_magnitude ? `(${a.trend_magnitude})` : ''}
-        </span>
-
-        <span className={`text-sm font-semibold ${RISK_COLOR[a.risk_level] || ''}`}>
-          {a.risk_level} Risk
-        </span>
-
-        {a.data_freshness && (
-          <span className={`text-[10px] font-mono font-semibold uppercase tracking-wider ${FRESHNESS_COLOR[a.data_freshness] || 'text-slate-400'}`}>
-            <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${
-              a.data_freshness === 'real-time' ? 'bg-emerald-400 pulse-ring' :
-              a.data_freshness === 'stale' ? 'bg-red-400' : 'bg-amber-400'
-            }`} />
-            {a.data_freshness}
-          </span>
-        )}
+    <div className="p-6 max-w-7xl mx-auto">
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
+        <div className="data-label mb-2">MARKET SIGNAL REPORT</div>
+        <h1 className="text-2xl font-bold" style={{ color: 'var(--color-text-primary)', fontFamily: 'var(--font-sora)' }}>Financial Analysis</h1>
       </motion.div>
 
-      {/* Price Chart */}
-      {data.graph_data?.data?.length > 0 && (
-        <PriceChart data={data.graph_data} />
-      )}
-
-      {/* Summary */}
-      <p className='text-[var(--foreground)] leading-relaxed text-base'>
-        {a.summary}
-      </p>
-
-      {/* Key Factors */}
-      {a.key_factors?.length > 0 && (
-        <section>
-          <h2 className='text-sm font-semibold uppercase tracking-wide text-[var(--muted-foreground)] mb-3'>
-            Key Factors
-          </h2>
-          <div className='flex flex-wrap gap-2'>
-            {a.key_factors.map((f: string, i: number) => (
-              <span key={i} className='px-3 py-1 rounded-full text-sm bg-[var(--card)] border border-[var(--card-border)] text-[var(--foreground)]'>
-                {f}
-              </span>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Risk Catalysts */}
-      {a.risk_catalysts?.length > 0 && (
-        <section>
-          <h2 className='text-sm font-semibold uppercase tracking-wide text-red-400 mb-3'>
-            Risk Catalysts
-          </h2>
-          <div className='space-y-2'>
-            {a.risk_catalysts.map((r: string, i: number) => (
-              <div key={i} className='flex items-start gap-2 p-3 rounded-xl bg-red-950/30 border border-red-800/40'>
-                <span className='text-red-400 text-sm font-bold mt-0.5'>!</span>
-                <p className='text-sm text-red-300'>{r}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* 30-Day Prediction */}
-      {a.prediction_30d && (
-        <div className='grid grid-cols-1 sm:grid-cols-3 gap-3'>
-          {['bull_case', 'base_case', 'bear_case'].map((key) => {
-            const label = key === 'bull_case' ? 'Bull Case' : key === 'base_case' ? 'Base Case' : 'Bear Case';
-            const color = key === 'bull_case' ? 'border-emerald-500/30 bg-emerald-950/20' :
-              key === 'base_case' ? 'border-indigo-500/30 bg-indigo-950/20' :
-              'border-red-500/30 bg-red-950/20';
-            const textColor = key === 'bull_case' ? 'text-emerald-300' :
-              key === 'base_case' ? 'text-indigo-300' :
-              'text-red-300';
-            return (
-              <div key={key} className={`rounded-xl border ${color} p-4 backdrop-blur-sm`}>
-                <p className={`text-xs font-bold uppercase tracking-wider ${textColor} mb-1`}>{label}</p>
-                <p className='text-sm text-slate-300'>{a.prediction_30d[key] || 'N/A'}</p>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Sources */}
-      {a.sources?.length > 0 && (
-        <section>
-          <h2 className='text-lg font-semibold mb-3'>Market Sources</h2>
-          <div className='space-y-3'>
-            {a.sources.map((s: any, i: number) => (
-              <a key={i} href={s.url} target='_blank' rel='noopener noreferrer'
-                className='flex items-start gap-3 p-3 rounded-xl border border-[var(--card-border)] bg-[var(--card)] hover:bg-[var(--muted)] transition-colors group'
-              >
-                <div className='flex-1 min-w-0'>
-                  <p className='text-sm font-medium group-hover:text-[var(--accent)] transition-colors truncate'>{s.title}</p>
-                  {s.date && <p className='text-xs text-[var(--muted-foreground)] mt-0.5'>{s.date}</p>}
+      <div className="grid lg:grid-cols-5 gap-6">
+        {/* Chart area - 3 cols */}
+        <div className="lg:col-span-3 space-y-6">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-2xl p-6"
+            style={{ backgroundColor: 'var(--color-bg-surface)', border: '1px solid var(--color-border-default)' }}
+          >
+            <div className="flex items-start justify-between mb-6 flex-wrap gap-4">
+              <div>
+                <div className="data-label mb-1">{graph_data?.label} · {analysis.asset}</div>
+                <div className="text-2xl font-bold" style={{ color: 'var(--color-text-primary)', fontFamily: 'var(--font-sora)' }}>
+                  {graph_data?.label}
                 </div>
-              </a>
-            ))}
-          </div>
-        </section>
-      )}
-    </main>
+                <div className="flex items-baseline gap-3 mt-1">
+                  <div className="font-mono text-4xl font-black" style={{ color: 'var(--color-text-primary)' }}>
+                    ${graph_data?.current_price?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '0.00'}
+                  </div>
+                  {graph_data?.change_24h && (
+                    <div className={`flex items-center gap-1 px-2 py-1 rounded text-sm font-semibold ${isPositive ? 'bg-emerald-500/10 text-[var(--color-accent-emerald)]' : 'bg-red-500/10 text-[var(--color-accent-red)]'}`}>
+                      {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                      {graph_data.change_24h}
+                    </div>
+                  )}
+                </div>
+                <div className="data-label mt-1 flex items-center gap-3">
+                  {graph_data?.change_7d && <span>7d: <span className={graph_data.change_7d.startsWith('+') ? 'text-[var(--color-accent-emerald)]' : 'text-[var(--color-accent-red)]'}>{graph_data.change_7d}</span></span>}
+                  {graph_data?.all_time_high && <span>ATH: <span className="font-mono">${graph_data.all_time_high.toLocaleString()}</span></span>}
+                </div>
+              </div>
+              {analysis.data_freshness && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full"
+                  style={{
+                    backgroundColor: freshnessLive ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+                    border: freshnessLive ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(245, 158, 11, 0.3)',
+                  }}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${freshnessLive ? 'bg-[var(--color-accent-emerald)]' : 'bg-[var(--color-accent-amber)]'}`} />
+                  <span className="data-label" style={{ color: freshnessLive ? '#10B981' : '#F59E0B' }}>
+                    {freshnessLive ? 'LIVE' : analysis.data_freshness.toUpperCase()}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="h-[280px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={graph_data?.data ?? []} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="priceGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={lineColor} stopOpacity={0.3} />
+                      <stop offset="100%" stopColor={lineColor} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(99, 102, 241, 0.08)" vertical={false} />
+                  <XAxis dataKey="date" tickFormatter={formatDate} stroke="#3D4F6B" style={{ fontFamily: 'DM Mono', fontSize: 10 }} tickLine={false} axisLine={false} />
+                  <YAxis domain={['dataMin - 500', 'dataMax + 500']} tickFormatter={(v: number) => formatPrice(v)} stroke="#3D4F6B" style={{ fontFamily: 'DM Mono', fontSize: 10 }} tickLine={false} axisLine={false} orientation="right" />
+                  <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 30, 53, 0.95)', border: '1px solid rgba(99, 102, 241, 0.3)', borderRadius: 8, fontFamily: 'DM Mono', fontSize: 12 }} labelStyle={{ color: '#7E8FAD', marginBottom: 4 }} formatter={(value) => [`$${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2 })}`, 'Price']} />
+                  <ReferenceLine y={avgPrice} stroke="#7E8FAD" strokeDasharray="4 4" label={{ value: 'AVG', position: 'left', style: { fontFamily: 'DM Mono', fontSize: 9, fill: '#7E8FAD' } }} />
+                  <Area type="monotone" dataKey="price" stroke={lineColor} strokeWidth={2} fill="url(#priceGradient)" animationDuration={1500} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="rounded-2xl p-6"
+            style={{ backgroundColor: 'var(--color-bg-surface)', border: '1px solid var(--color-border-default)' }}
+          >
+            <div className="data-label mb-3">MARKET INTELLIGENCE</div>
+            <p className="leading-relaxed" style={{ color: 'var(--color-text-primary)' }}>{analysis.summary}</p>
+          </motion.div>
+        </div>
+
+        {/* Signal panel - 2 cols */}
+        <div className="lg:col-span-2 space-y-6">
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="rounded-2xl p-5"
+            style={{ backgroundColor: 'var(--color-bg-surface)', border: '1px solid var(--color-border-default)' }}
+          >
+            <div className="data-label mb-3">SIGNAL</div>
+            <div className="flex items-center gap-4 mb-4">
+              <div className="relative">
+                <SignalIcon className="w-12 h-12" style={{ color: signalColor }} />
+                <div className="absolute inset-0 w-12 h-12 blur-xl opacity-40" style={{ backgroundColor: signalColor }} />
+              </div>
+              <div>
+                <div className="text-3xl font-black" style={{ color: signalColor, textShadow: `0 0 20px ${signalColor}60`, fontFamily: 'var(--font-sora)' }}>
+                  {analysis.signal.toUpperCase()}
+                </div>
+                <div className="data-label mt-1">Strength: {analysis.signal_strength}/100</div>
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <div className="h-1.5 overflow-hidden rounded-full" style={{ backgroundColor: 'var(--color-bg-elevated)' }}>
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${analysis.signal_strength}%` }}
+                  transition={{ duration: 1, ease: 'easeOut' }}
+                  className="h-full rounded-full"
+                  style={{ backgroundColor: signalColor, boxShadow: `0 0 8px ${signalColor}` }}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className="p-3 rounded-lg border" style={{ borderColor: 'var(--color-border-subtle)' }}>
+                <div className="data-label mb-1">PRICE TREND</div>
+                <div className="flex items-center gap-1">
+                  <TrendIcon className="w-4 h-4" style={{ color: trendColor }} />
+                  <span className="text-sm font-semibold" style={{ color: trendColor }}>
+                    {analysis.price_trend === 'Up' ? 'Strong Up' : analysis.price_trend === 'Down' ? 'Moderate Down' : 'Sideways'}
+                  </span>
+                </div>
+              </div>
+              <div className="p-3 rounded-lg border" style={{ borderColor: 'var(--color-border-subtle)' }}>
+                <div className="data-label mb-1">RISK LEVEL</div>
+                <div className="flex items-center gap-1">
+                  <AlertTriangle className="w-4 h-4" style={{ color: riskColor }} />
+                  <span className="text-sm font-semibold" style={{ color: riskColor }}>{analysis.risk_level}</span>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.2 }}
+            className="rounded-2xl p-5"
+            style={{ backgroundColor: 'var(--color-bg-surface)', border: '1px solid var(--color-border-default)' }}
+          >
+            <div className="data-label mb-3 flex items-center gap-2">
+              <Activity className="w-3 h-3" />
+              30-DAY PREDICTION
+            </div>
+            <div className="space-y-3">
+              {analysis.prediction_30d && (
+                <>
+                  <div className="border-l-[3px] pl-3 py-1" style={{ borderColor: '#10B981' }}>
+                    <div className="data-label mb-1" style={{ color: 'var(--color-accent-emerald)' }}>BULL CASE</div>
+                    <div className="text-xs leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>{analysis.prediction_30d.bull_case}</div>
+                  </div>
+                  <div className="border-l-[3px] pl-3 py-1" style={{ borderColor: '#4F46E5' }}>
+                    <div className="data-label mb-1" style={{ color: 'var(--color-accent-primary)' }}>BASE CASE</div>
+                    <div className="text-xs leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>{analysis.prediction_30d.base_case}</div>
+                  </div>
+                  <div className="border-l-[3px] pl-3 py-1" style={{ borderColor: '#EF4444' }}>
+                    <div className="data-label mb-1" style={{ color: 'var(--color-accent-red)' }}>BEAR CASE</div>
+                    <div className="text-xs leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>{analysis.prediction_30d.bear_case}</div>
+                  </div>
+                </>
+              )}
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.3 }}
+            className="rounded-2xl p-5"
+            style={{ backgroundColor: 'var(--color-bg-surface)', border: '1px solid var(--color-border-default)' }}
+          >
+            <div className="data-label mb-3">KEY FACTORS</div>
+            <div className="space-y-2">
+              {analysis.key_factors?.map((factor, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.4 + i * 0.05 }}
+                  className="flex items-start gap-2 text-xs"
+                  style={{ color: 'var(--color-text-secondary)' }}
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-0.5" style={{ color: 'var(--color-accent-primary)' }} />
+                  <span className="leading-relaxed">{factor}</span>
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.4 }}
+            className="rounded-2xl p-5"
+            style={{ backgroundColor: 'var(--color-bg-surface)', border: '1px solid var(--color-border-default)' }}
+          >
+            <div className="data-label mb-3">RISK CATALYSTS</div>
+            <div className="space-y-2">
+              {analysis.risk_catalysts?.map((cat, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.5 + i * 0.05 }}
+                  className="flex items-start gap-2 p-2 rounded text-xs leading-relaxed"
+                  style={{ backgroundColor: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.1)', color: 'var(--color-text-secondary)' }}
+                >
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" style={{ color: 'var(--color-accent-amber)' }} />
+                  <span>{cat}</span>
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.5 }}
+            className="rounded-2xl p-5"
+            style={{ backgroundColor: 'var(--color-bg-surface)', border: '1px solid var(--color-border-default)' }}
+          >
+            <div className="data-label mb-3">SOURCES ({data.sources?.length ?? 0})</div>
+            <div className="space-y-2">
+              {data.sources?.map((source: FinancialSource, i: number) => (
+                <a
+                  key={i}
+                  href={source.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 py-1.5 transition-colors group"
+                  style={{ color: 'var(--color-text-primary)' }}
+                >
+                  <div className="w-5 h-5 rounded flex items-center justify-center text-[9px] font-mono shrink-0"
+                    style={{ backgroundColor: 'var(--color-bg-elevated)', color: 'var(--color-text-tertiary)' }}
+                  >S</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs truncate transition-colors group-hover:text-[var(--color-accent-primary)]" style={{ color: 'var(--color-text-primary)' }}>
+                      {source.title}
+                    </div>
+                    {source.date && <div className="data-label font-mono mt-0.5">{source.date}</div>}
+                  </div>
+                  <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: 'var(--color-text-tertiary)' }} />
+                </a>
+              ))}
+            </div>
+          </motion.div>
+        </div>
+      </div>
+    </div>
   );
 }

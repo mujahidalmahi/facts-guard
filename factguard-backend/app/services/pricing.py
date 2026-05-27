@@ -40,13 +40,9 @@ from app.utils.search import (
     search_claim,
 )
 
-logger = get_logger(
-    "pricing"
-)
+logger = get_logger("pricing")
 
-CACHE_PREFIX = (
-    "factguard:pricing:"
-)
+CACHE_PREFIX = "factguard:pricing:"
 
 
 def _listing_to_insert(
@@ -54,52 +50,27 @@ def _listing_to_insert(
     query_id: str,
 ) -> dict:
     return {
-        "query_id":
-            query_id,
-
-        "title":
-            listing.get(
-                "title",
-                "",
-            ),
-
-        "price":
-            listing.get(
-                "price"
-            ),
-
-        "currency":
-            listing.get(
-                "currency",
-                "USD",
-            ),
-
-        "merchant":
-            listing.get(
-                "merchant",
-                "",
-            ),
-
-        "url":
-            listing.get(
-                "url",
-                "",
-            ),
-
-        "image":
-            listing.get(
-                "image"
-            ),
-
-        "condition":
-            listing.get(
-                "condition"
-            ),
-
-        "model_name":
-            listing.get(
-                "model_name"
-            ),
+        "query_id": query_id,
+        "title": listing.get(
+            "title",
+            "",
+        ),
+        "price": listing.get("price"),
+        "currency": listing.get(
+            "currency",
+            "USD",
+        ),
+        "merchant": listing.get(
+            "merchant",
+            "",
+        ),
+        "url": listing.get(
+            "url",
+            "",
+        ),
+        "image": listing.get("image"),
+        "condition": listing.get("condition"),
+        "model_name": listing.get("model_name"),
     }
 
 
@@ -107,16 +78,10 @@ def _build_ai_analysis(
     ai_enrichment: dict | None,
     listings_data: list[dict],
 ) -> dict:
-    prices = [
-        x.get("price") for x in listings_data
-        if x.get("price") is not None
-    ]
+    prices = [x.get("price") for x in listings_data if x.get("price") is not None]
     low_price = str(min(prices, default=0))
     high_price = str(max(prices, default=0))
-    product_name = (
-        listings_data[0].get("title", "")
-        if listings_data else ""
-    )
+    product_name = listings_data[0].get("title", "") if listings_data else ""
 
     if not ai_enrichment:
         return {
@@ -128,24 +93,16 @@ def _build_ai_analysis(
                 "currency": "USD",
             },
             "best_deal": {
-                "merchant":
-                    listings_data[0].get("merchant", "Unknown")
-                if listings_data
-                else "Unknown",
-                "price":
-                    f"${low_price}"
-                if listings_data
-                else "N/A",
-                "url":
-                    listings_data[0].get("url", "")
-                if listings_data
-                else "",
+                "merchant": (
+                    listings_data[0].get("merchant", "Unknown") if listings_data else "Unknown"
+                ),
+                "price": f"${low_price}" if listings_data else "N/A",
+                "url": listings_data[0].get("url", "") if listings_data else "",
                 "reason": "Lowest trusted result",
             },
             "analysis": {
                 "warnings": [],
-                "recommendation":
-                    "Compare seller reputation before purchasing.",
+                "recommendation": "Compare seller reputation before purchasing.",
                 "price_trend": "Stable",
                 "best_time_to_buy": "Wait",
             },
@@ -156,49 +113,25 @@ def _build_ai_analysis(
         "product_name": product_name,
         "msrp": None,
         "fair_market_range": {
-            "min":
-                str(
-                    ai_enrichment
-                    .get("price_range", {})
-                    .get("low", low_price)
-                ),
-            "max":
-                str(
-                    ai_enrichment
-                    .get("price_range", {})
-                    .get("high", high_price)
-                ),
+            "min": str(ai_enrichment.get("price_range", {}).get("low", low_price)),
+            "max": str(ai_enrichment.get("price_range", {}).get("high", high_price)),
             "currency": "USD",
         },
         "best_deal": {
-            "merchant":
-                best_deal.get("platform", "Unknown")
-            if best_deal
-            else "Unknown",
-            "price":
-                f"${best_deal.get('price', low_price)}"
-            if best_deal
-            else f"${low_price}",
-            "url":
-                best_deal.get("url", "")
-            if best_deal
-            else "",
-            "reason":
-                best_deal.get("why", "")
-            if best_deal
-            else "",
+            "merchant": best_deal.get("platform", "Unknown") if best_deal else "Unknown",
+            "price": f"${best_deal.get('price', low_price)}" if best_deal else f"${low_price}",
+            "url": best_deal.get("url", "") if best_deal else "",
+            "reason": best_deal.get("why", "") if best_deal else "",
         },
         "analysis": {
-            "warnings":
-                ai_enrichment.get(
-                    "warnings",
-                    [],
-                ),
-            "recommendation":
-                ai_enrichment.get(
-                    "recommendation",
-                    "Compare seller reputation before purchasing.",
-                ),
+            "warnings": ai_enrichment.get(
+                "warnings",
+                [],
+            ),
+            "recommendation": ai_enrichment.get(
+                "recommendation",
+                "Compare seller reputation before purchasing.",
+            ),
             "price_trend": "Stable",
             "best_time_to_buy": "Wait",
         },
@@ -208,68 +141,41 @@ def _build_ai_analysis(
 def _listing_to_response(
     listing: dict,
 ) -> dict:
-    trust = (
-        get_trust_level(
-            listing.get(
-                "merchant",
-                "",
-            )
+    trust = get_trust_level(
+        listing.get(
+            "merchant",
+            "",
         )
-        .lower()
-    )
+    ).lower()
 
-    trust_signal = (
-        "green"
-        if trust == "high"
-        else (
-            "yellow"
-            if trust
-            == "medium"
-            else "red"
-        )
-    )
+    trust_signal = "green" if trust == "high" else ("yellow" if trust == "medium" else "red")
 
     return {
-        "title":
-            listing.get(
-                "title",
-                "",
-            ),
-
-        "merchant":
-            listing.get(
-                "merchant",
-                "Unknown",
-            ),
-
-        "price":
-            listing.get("price"),
-
-        "currency":
-            listing.get(
-                "currency",
-                "USD",
-            ),
-
-        "url":
-            listing.get(
-                "url",
-                "",
-            ),
-
-        "trust_level":
-            trust_signal.upper(),
-
+        "title": listing.get(
+            "title",
+            "",
+        ),
+        "merchant": listing.get(
+            "merchant",
+            "Unknown",
+        ),
+        "price": listing.get("price"),
+        "currency": listing.get(
+            "currency",
+            "USD",
+        ),
+        "url": listing.get(
+            "url",
+            "",
+        ),
+        "trust_level": trust_signal.upper(),
         "deal_score": 0,
         "trust_reason": "",
         "counterfeit_risk": "None",
-
-        "condition":
-            listing.get(
-                "condition",
-                "Unknown",
-            ),
-
+        "condition": listing.get(
+            "condition",
+            "Unknown",
+        ),
         "in_stock": True,
     }
 
@@ -282,34 +188,20 @@ async def create_query(
         result = await insert(
             "product_queries",
             {
-                "product_name":
-                    product_name,
-
-                "job_id":
-                    job_id,
-
-                "status":
-                    STATUS_PROCESSING,
+                "product_name": product_name,
+                "job_id": job_id,
+                "status": STATUS_PROCESSING,
             },
         )
 
-        query_id = (
-            result.data[0]["id"]
-        )
+        query_id = result.data[0]["id"]
 
-        logger.debug(
-            f"Price query created: "
-            f"{query_id}"
-        )
+        logger.debug(f"Price query created: " f"{query_id}")
 
         return query_id
 
     except Exception as e:
-        logger.error(
-            f"Failed to create "
-            f"price query: "
-            f"{type(e).__name__}: {e}"
-        )
+        logger.error(f"Failed to create " f"price query: " f"{type(e).__name__}: {e}")
         raise
 
 
@@ -318,9 +210,7 @@ async def save_listings(
     listings: list[dict],
 ):
     if not listings:
-        logger.debug(
-            "No listings to save"
-        )
+        logger.debug("No listings to save")
         return
 
     try:
@@ -337,18 +227,10 @@ async def save_listings(
             rows,
         )
 
-        logger.debug(
-            f"Saved "
-            f"{len(rows)} "
-            f"listings"
-        )
+        logger.debug(f"Saved " f"{len(rows)} " f"listings")
 
     except Exception as e:
-        logger.error(
-            f"Failed to save "
-            f"listings: "
-            f"{type(e).__name__}: {e}"
-        )
+        logger.error(f"Failed to save " f"listings: " f"{type(e).__name__}: {e}")
 
 
 async def update_query_status(
@@ -358,60 +240,34 @@ async def update_query_status(
     try:
         await update(
             "product_queries",
-            {
-                "status":
-                    status
-            },
+            {"status": status},
             "id",
             query_id,
         )
 
-        logger.debug(
-            f"Query "
-            f"{query_id} "
-            f"status updated "
-            f"to: {status}"
-        )
+        logger.debug(f"Query " f"{query_id} " f"status updated " f"to: {status}")
 
     except Exception as e:
-        logger.error(
-            f"Failed to update "
-            f"query status: "
-            f"{type(e).__name__}: {e}"
-        )
+        logger.error(f"Failed to update " f"query status: " f"{type(e).__name__}: {e}")
 
 
 async def get_full_price_result(
     job_id: str,
 ) -> dict | None:
 
-    saved = (
-        await get_saved_cart_result(
-            job_id
-        )
-    )
+    saved = await get_saved_cart_result(job_id)
 
     if saved:
-        logger.info(
-            f"Cart cache hit: "
-            f"{job_id}"
-        )
+        logger.info(f"Cart cache hit: " f"{job_id}")
 
-        return saved.get(
-            "result"
-        )
+        return saved.get("result")
 
     try:
-        query_response = (
-            await select(
-                "product_queries",
-                eq_field=
-                    "job_id",
-                eq_value=
-                    job_id,
-                maybe_single=
-                    True,
-            )
+        query_response = await select(
+            "product_queries",
+            eq_field="job_id",
+            eq_value=job_id,
+            maybe_single=True,
         )
 
     except Exception as e:
@@ -426,32 +282,17 @@ async def get_full_price_result(
 
         return None
 
-    if (
-        not query_response
-        or not query_response.data
-    ):
-        logger.warning(
-            f"Price query "
-            f"not found for "
-            f"job_id: {job_id}"
-        )
+    if not query_response or not query_response.data:
+        logger.warning(f"Price query " f"not found for " f"job_id: {job_id}")
 
         return None
 
-    query = (
-        query_response.data
-    )
+    query = query_response.data
 
-    query_id = query.get(
-        "id"
-    )
+    query_id = query.get("id")
 
     if not query_id:
-        logger.warning(
-            f"Price query "
-            f"has no id for "
-            f"job_id: {job_id}"
-        )
+        logger.warning(f"Price query " f"has no id for " f"job_id: {job_id}")
 
         return None
 
@@ -460,47 +301,28 @@ async def get_full_price_result(
         STATUS_PROCESSING,
     )
 
-    if (
-        status
-        == STATUS_PROCESSING
-    ):
+    if status == STATUS_PROCESSING:
         return {
-            "status":
-                STATUS_PROCESSING,
-
-            "jobId":
-                query.get(
-                    "job_id",
-                    job_id,
-                ),
-
-            "product":
-                query.get(
-                    "product_name",
-                    "",
-                ),
-
-            "createdAt":
-                query.get(
-                    "created_at"
-                ),
+            "status": STATUS_PROCESSING,
+            "jobId": query.get(
+                "job_id",
+                job_id,
+            ),
+            "product": query.get(
+                "product_name",
+                "",
+            ),
+            "createdAt": query.get("created_at"),
         }
 
     try:
-        listings_response = (
-            await select(
-                "product_listings",
-                eq_field=
-                    "query_id",
-                eq_value=
-                    query_id,
-            )
+        listings_response = await select(
+            "product_listings",
+            eq_field="query_id",
+            eq_value=query_id,
         )
 
-        listings_data = (
-            listings_response.data
-            or []
-        )
+        listings_data = listings_response.data or []
 
     except Exception as e:
         logger.error(
@@ -513,52 +335,27 @@ async def get_full_price_result(
 
         listings_data = []
 
-    ai_enrichment = (
-        query.get(
-            "ai_enrichment"
-        )
-    )
+    ai_enrichment = query.get("ai_enrichment")
 
-    analysis = (
-        _build_ai_analysis(
-            ai_enrichment,
-            listings_data,
-        )
+    analysis = _build_ai_analysis(
+        ai_enrichment,
+        listings_data,
     )
 
     result = {
-        "mode":
-            "cart",
-
-        "status":
-            status,
-
-        "jobId":
-            query.get(
-                "job_id",
-                job_id,
-            ),
-
-        "product":
-            query.get(
-                "product_name",
-                "",
-            ),
-
-        "createdAt":
-            query.get(
-                "created_at"
-            ),
-
-        "listings": [
-            _listing_to_response(
-                listing
-            )
-            for listing in listings_data
-        ],
-
-        "analysis":
-            analysis,
+        "mode": "cart",
+        "status": status,
+        "jobId": query.get(
+            "job_id",
+            job_id,
+        ),
+        "product": query.get(
+            "product_name",
+            "",
+        ),
+        "createdAt": query.get("created_at"),
+        "listings": [_listing_to_response(listing) for listing in listings_data],
+        "analysis": analysis,
     }
 
     await save_cart_result(
@@ -579,33 +376,23 @@ async def fetch_product_prices(
     list[dict],
     list[dict],
 ]:
-    search_query = (
-        f"{product_name} "
-        f"price buy online"
-    )
+    search_query = f"{product_name} " f"price buy online"
 
-    results = (
-        await search_claim(
-            search_query,
-            max_results=10,
-        )
+    results = await search_claim(
+        search_query,
+        max_results=10,
     )
 
     seen_urls = set()
     raw_listings = []
 
     for r in results:
-        url = r.get(
-            "url",
-            ""
-        )
+        url = r.get("url", "")
 
         if url in seen_urls:
             continue
 
-        seen_urls.add(
-            url
-        )
+        seen_urls.add(url)
 
         snippet = r.get(
             "snippet",
@@ -617,66 +404,28 @@ async def fetch_product_prices(
             "",
         )
 
-        price = (
-            extract_price(
-                snippet
-            )
-            or extract_price(
-                title
-            )
-        )
+        price = extract_price(snippet) or extract_price(title)
 
-        merchant = (
-            classify_merchant(
-                url
-            )
-        )
+        merchant = classify_merchant(url)
 
-        model_name = (
-            extract_model_name(
-                title
-            )
-        )
+        model_name = extract_model_name(title)
 
         raw_listings.append(
             {
-                "title":
-                    title,
-
-                "price":
-                    price,
-
-                "currency":
-                    "USD",
-
-                "merchant":
-                    merchant,
-
-                "url":
-                    url,
-
-                "image":
-                    None,
-
-                "condition":
-                    None,
-
-                "model_name":
-                    model_name,
+                "title": title,
+                "price": price,
+                "currency": "USD",
+                "merchant": merchant,
+                "url": url,
+                "image": None,
+                "condition": None,
+                "model_name": model_name,
             }
         )
 
-    sorted_listings = (
-        sort_listings(
-            raw_listings
-        )
-    )
+    sorted_listings = sort_listings(raw_listings)
 
-    variants = (
-        cluster_listings(
-            sorted_listings
-        )
-    )
+    variants = cluster_listings(sorted_listings)
 
     return (
         sorted_listings,
@@ -695,25 +444,12 @@ async def process_price_check(
             PRICING_PROGRESS_SEARCHING,
         )
 
-        search_hash = (
-            compute_claim_hash(
-                product_name
-            )
-        )
+        search_hash = compute_claim_hash(product_name)
 
-        cached = (
-            await get_cached_analysis(
-                f"{CACHE_PREFIX}{search_hash}"
-            )
-        )
+        cached = await get_cached_analysis(f"{CACHE_PREFIX}{search_hash}")
 
         if cached:
-            logger.info(
-                f"Cache hit "
-                f"for product "
-                f"search: "
-                f"{product_name}"
-            )
+            logger.info(f"Cache hit " f"for product " f"search: " f"{product_name}")
 
             listings = cached.get(
                 "listings",
@@ -726,41 +462,27 @@ async def process_price_check(
             )
 
         else:
-            logger.info(
-                f"Cache miss, "
-                f"searching "
-                f"prices for: "
-                f"{product_name}"
-            )
+            logger.info(f"Cache miss, " f"searching " f"prices for: " f"{product_name}")
 
             await set_progress(
                 job_id,
                 PRICING_PROGRESS_ANALYZING,
             )
 
-            listings, variants = (
-                await fetch_product_prices(
-                    product_name
-                )
-            )
+            listings, variants = await fetch_product_prices(product_name)
 
             await set_cached_analysis(
                 f"{CACHE_PREFIX}{search_hash}",
                 {
-                    "listings":
-                        listings,
-
-                    "variants":
-                        variants,
+                    "listings": listings,
+                    "variants": variants,
                 },
             )
 
-        ai_enrichment = (
-            await enrich_cart_listings(
-                product_name,
-                listings,
-                job_id,
-            )
+        ai_enrichment = await enrich_cart_listings(
+            product_name,
+            listings,
+            job_id,
         )
 
         await set_progress(
@@ -776,42 +498,29 @@ async def process_price_check(
         await update(
             "product_queries",
             {
-                "status":
-                    STATUS_DONE,
-
-                "variants_data":
-                    variants,
-
-                "ai_enrichment":
-                    ai_enrichment,
+                "status": STATUS_DONE,
+                "variants_data": variants,
+                "ai_enrichment": ai_enrichment,
             },
             "id",
             query_id,
         )
 
-        await push_claim_to_history({
-            "jobId": job_id,
-            "claim": f"[CART] {product_name}",
-            "status": STATUS_DONE,
-            "createdAt": datetime.now(timezone.utc).isoformat(),
-        })
+        await push_claim_to_history(
+            {
+                "jobId": job_id,
+                "claim": f"[CART] {product_name}",
+                "status": STATUS_DONE,
+                "createdAt": datetime.now(timezone.utc).isoformat(),
+            }
+        )
 
         logger.info(
-            f"Price check "
-            f"{query_id} "
-            f"completed with "
-            f"{len(listings)} "
-            f"listings"
+            f"Price check " f"{query_id} " f"completed with " f"{len(listings)} " f"listings"
         )
 
     except Exception as e:
-        logger.error(
-            f"Failed to "
-            f"process price "
-            f"check "
-            f"{query_id}: "
-            f"{str(e)}"
-        )
+        logger.error(f"Failed to " f"process price " f"check " f"{query_id}: " f"{str(e)}")
 
         await set_progress(
             job_id,

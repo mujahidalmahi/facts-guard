@@ -1,9 +1,13 @@
+import contextvars
 import json
 import logging
 import sys
+import uuid
 from datetime import datetime, timezone
 
 from app.config import settings
+
+request_id_ctx: contextvars.ContextVar[str] = contextvars.ContextVar("request_id", default="")
 
 
 class JSONFormatter(logging.Formatter):
@@ -16,6 +20,7 @@ class JSONFormatter(logging.Formatter):
             "module": record.module,
             "function": record.funcName,
             "line": record.lineno,
+            "request_id": request_id_ctx.get() or None,
         }
         if record.exc_info:
             log_data["exception"] = self.formatException(record.exc_info)
@@ -27,8 +32,10 @@ class JSONFormatter(logging.Formatter):
 class TextFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        rid = request_id_ctx.get()
+        rid_str = f" [{rid}]" if rid else ""
         log_message = (
-            f"[{timestamp}] {record.levelname:<8} "
+            f"[{timestamp}]{rid_str} {record.levelname:<8} "
             f"{record.name}:{record.funcName}:{record.lineno} - {record.getMessage()}"
         )
         if record.exc_info:

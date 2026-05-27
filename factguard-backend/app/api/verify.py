@@ -1,4 +1,3 @@
-import asyncio
 import uuid
 from datetime import (
     datetime,
@@ -7,6 +6,8 @@ from datetime import (
 
 from fastapi import (
     APIRouter,
+    BackgroundTasks,
+    Response,
 )
 
 from app.logging_config import (
@@ -14,6 +15,7 @@ from app.logging_config import (
 )
 
 from app.schemas import (
+    JobResponse,
     VerifyRequest,
 )
 
@@ -24,7 +26,9 @@ from app.utils.constants import (
 
 from app.services.cache import (
     compute_claim_hash,
+    get_cached_analysis,
     get_job_result,
+    get_progress,
     push_claim_to_history,
     set_cached_analysis,
     set_job_result,
@@ -44,17 +48,7 @@ from app.services.supabase_db import (
     update_claim_status,
 )
 
-from app.services.pricing import (
-    get_full_price_result,
-)
-
-from app.services.financial import (
-    get_full_financial_result,
-)
-
-logger = get_logger(
-    "verify"
-)
+logger = get_logger("verify")
 
 router = APIRouter()
 
@@ -70,27 +64,17 @@ async def process_claim(
             "Checking cache...",
         )
 
-        claim_hash = (
-            compute_claim_hash(
-                claim_text
-            )
-        )
+        claim_hash = compute_claim_hash(claim_text)
 
-        cached = (
-            await get_cached_analysis(
-                claim_hash
-            )
-        )
+        cached = await get_cached_analysis(claim_hash)
 
         if cached:
             result = cached
 
         else:
-            result = (
-                await analyze_claim(
-                    claim_text,
-                    job_id,
-                )
+            result = await analyze_claim(
+                claim_text,
+                job_id,
             )
 
             if not result.pop(
@@ -112,12 +96,10 @@ async def process_claim(
             "Saving results...",
         )
 
-        result_id = (
-            await save_result(
-                claim_id,
-                result,
-                job_id,
-            )
+        result_id = await save_result(
+            claim_id,
+            result,
+            job_id,
         )
 
         await save_sources(
@@ -135,23 +117,15 @@ async def process_claim(
 
         await push_claim_to_history(
             {
-                "jobId":
-                    job_id,
-                "claim":
-                    claim_text,
-                "status":
-                    STATUS_DONE,
-                "createdAt":
-                    datetime.now(
-                        timezone.utc
-                    ).isoformat(),
+                "jobId": job_id,
+                "claim": claim_text,
+                "status": STATUS_DONE,
+                "createdAt": datetime.now(timezone.utc).isoformat(),
             }
         )
 
     except Exception as e:
-        logger.error(
-            f"Failed: {e}"
-        )
+        logger.error(f"Failed: {e}")
 
         await set_progress(
             job_id,
@@ -164,114 +138,60 @@ async def process_claim(
         )
 
 
-@router.post(
-    "/verify"
-)
+@router.post("/verify", response_model=JobResponse, status_code=202)
 async def verify(
-    payload:
-    VerifyRequest,
+    payload: VerifyRequest,
+    background_tasks: BackgroundTasks,
 ):
-    job_id = str(
-        uuid.uuid4()
+    job_id = str(uuid.uuid4())
+
+    claim_id = await create_claim(
+        payload.claim,
+        job_id,
     )
 
-    claim_id = (
-        await create_claim(
-            payload.claim,
-            job_id,
-        )
+    background_tasks.add_task(
+        process_claim,
+        claim_id,
+        payload.claim,
+        job_id,
     )
 
-    asyncio.create_task(
-        process_claim(
-            claim_id,
-            payload.claim,
-            job_id,
-        )
-    )
-
-    return {
-        "jobId":
-            job_id
-    }
+    return JobResponse(jobId=job_id)
 
 
-@router.get(
-    "/result/{job_id}"
-)
+@router.get("/result/{job_id}")
 async def get_result(
     job_id: str,
-    mode:
-    str = "verify",
+    response: Response,
 ):
-    if (
-        mode
-        == "financial"
-    ):
-        return (
-            await get_full_financial_result(
-                job_id
-            )
-        )
-
-    if (
-        mode
-        == "cart"
-    ):
-        return (
-            await get_full_price_result(
-                job_id
-            )
-        )
-
-    result = (
-        await get_job_result(
-            job_id
-        )
-    )
+    result = await get_job_result(job_id)
 
     if not result:
-        db_row = (
-            await get_result_by_job_id(
-                job_id
-            )
-        )
+        db_row = await get_result_by_job_id(job_id)
 
         if db_row:
-            result = db_row.get(
-                "raw_json"
-            )
+            result = db_row.get("raw_json")
 
     if result:
+        response.headers["Cache-Control"] = "public, max-age=3600, stale-while-revalidate=86400"
         return {
             **result,
-            "status":
-                "done",
-            "jobId":
-                job_id,
+            "status": "done",
+            "jobId": job_id,
         }
 
-    claim = (
-        await get_claim_by_job_id(
-            job_id
-        )
-    )
+    claim = await get_claim_by_job_id(job_id)
 
-    if (
-        claim
-        and claim.get("status")
-        == "error"
-    ):
+    if claim and claim.get("status") == "error":
         return {
-            "status":
-                "error",
-            "jobId":
-                job_id,
+            "status": "error",
+            "jobId": job_id,
         }
 
+    progress = await get_progress(job_id)
     return {
-        "status":
-            "processing",
-        "jobId":
-            job_id,
+        "status": "processing",
+        "jobId": job_id,
+        "progress": progress or "Initialising...",
     }

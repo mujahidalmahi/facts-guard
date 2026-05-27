@@ -87,19 +87,11 @@ async def classify_query(
                     max_tokens=200,
                 )
 
-            text = (
-                text.replace(
-                    "```json", ""
-                )
-                .replace("```", "")
-                .strip()
-            )
+            text = text.replace("```json", "").replace("```", "").strip()
 
             result = json.loads(text)
 
-            mode = result.get(
-                "mode", "unclear"
-            )
+            mode = result.get("mode", "unclear")
             if mode not in valid_modes:
                 mode = "unclear"
 
@@ -113,19 +105,12 @@ async def classify_query(
                     "reason",
                     "Classification failed.",
                 ),
-                "normalised_input": (
-                    result.get(
-                        "normalised_input"
-                    )
-                    or raw_input
-                ),
+                "normalised_input": (result.get("normalised_input") or raw_input),
                 "_provider": provider,
             }
 
         except Exception as e:
-            logger.warning(
-                f"Router {provider} failed: {e}"
-            )
+            logger.warning(f"Router {provider} failed: {e}")
 
     return {
         "mode": "unclear",

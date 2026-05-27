@@ -7,163 +7,86 @@ from pydantic_settings import (
 )
 
 
-class Settings(
-    BaseSettings
-):
-    APP_NAME: str = (
-        "FactGuard API"
-    )
+class Settings(BaseSettings):
+    APP_NAME: str = "FactGuard API"
 
-    APP_VERSION: str = (
-        "1.0.0"
-    )
+    APP_VERSION: str = "1.0.0"
 
-    ENVIRONMENT: str = (
-        "development"
-    )
+    ENVIRONMENT: str = "development"
 
-    DEBUG: bool = True
+    DEBUG: bool = False
 
     HOST: str = "0.0.0.0"
     PORT: int = 8000
 
-    FRONTEND_URL: str = (
-        "http://localhost:3000"
-    )
+    FRONTEND_URL: str = "http://localhost:3000"
 
-    CORS_ALLOW_CREDENTIALS: (
-        bool
-    ) = True
+    CORS_ALLOW_CREDENTIALS: bool = True
 
-    CORS_ALLOW_METHODS: (
-        list[str]
-    ) = ["*"]
+    CORS_ALLOW_METHODS: list[str] = ["*"]
 
-    CORS_ALLOW_HEADERS: (
-        list[str]
-    ) = ["*"]
+    CORS_ALLOW_HEADERS: list[str] = ["*"]
 
-    GEMINI_API_KEYS: str = (
-        ""
-    )
+    GEMINI_API_KEYS: str = ""
 
-    GEMINI_MODEL_NAME: str = (
-        "gemini-2.5-flash"
-    )
+    GEMINI_MODEL_NAME: str = "gemini-2.5-flash"
 
-    DEEPSEEK_API_KEY: str = (
-        ""
-    )
+    DEEPSEEK_API_KEY: str = ""
 
-    DEEPSEEK_API_KEYS: str = (
-        ""
-    )
+    DEEPSEEK_API_KEYS: str = ""
 
-    GROQ_API_KEY: str = (
-        ""
-    )
+    GROQ_API_KEY: str = ""
 
-    BRIGHTDATA_API_KEY: str = (
-        ""
-    )
+    BRIGHTDATA_API_KEY: str = ""
 
-    BRIGHTDATA_SERP_ZONE: str = (
-        ""
-    )
+    BRIGHTDATA_SERP_ZONE: str = ""
 
-    BRIGHTDATA_BROWSER_ZONE: str = (
-        ""
-    )
+    BRIGHTDATA_BROWSER_ZONE: str = ""
 
-    BRIGHTDATA_WSS: str = (
-        ""
-    )
+    BRIGHTDATA_WSS: str = ""
 
-    BROWSER_TIMEOUT: int = (
-        15
-    )
+    BROWSER_TIMEOUT: int = 15
 
-    MAX_BROWSER_PAGES: int = (
-        1
-    )
+    MAX_BROWSER_PAGES: int = 1
 
-    CACHE_TTL_BROWSER: int = (
-        3600
-    )
+    CACHE_TTL_BROWSER: int = 3600
 
-    CLAUDE_API_KEY: str = (
-        ""
-    )
+    CLAUDE_API_KEY: str = ""
 
-    CLAUDE_API_KEYS: str = (
-        ""
-    )
+    CLAUDE_API_KEYS: str = ""
 
-    SUPABASE_URL: (
-        Optional[str]
-    ) = None
+    SUPABASE_URL: Optional[str] = None
 
-    SUPABASE_SERVICE_ROLE_KEY: (
-        Optional[str]
-    ) = None
+    SUPABASE_SERVICE_ROLE_KEY: Optional[str] = None
 
-    LOG_LEVEL: str = (
-        "INFO"
-    )
+    LOG_LEVEL: str = "INFO"
 
-    LOG_FORMAT: str = (
-        "text"
-    )
+    LOG_FORMAT: str = "text"
 
-    CLAIM_MIN_LENGTH: int = (
-        5
-    )
+    CLAIM_MIN_LENGTH: int = 5
 
-    CLAIM_MAX_LENGTH: int = (
-        2000
-    )
+    CLAIM_MAX_LENGTH: int = 2000
 
-    CACHE_TTL: int = (
-        86400
-    )
+    API_KEYS: str = ""
 
-    REDIS_URL: (
-        Optional[str]
-    ) = None
+    CACHE_TTL: int = 86400
 
-    ROUTER_MODEL: str = (
-        "gemini-2.5-flash"
-    )
+    REDIS_URL: Optional[str] = None
 
-    VERIFY_MODEL: str = (
-        "gemini-2.5-flash"
-    )
+    ROUTER_MODEL: str = "gemini-2.5-flash"
 
-    FINANCIAL_MODEL: str = (
-        "deepseek/deepseek-chat-v3-0324"
-    )
+    VERIFY_MODEL: str = "gemini-2.5-flash"
 
-    SNIPPET_MAX_CHARS: int = (
-        200
-    )
+    FINANCIAL_MODEL: str = "deepseek/deepseek-chat-v3-0324"
+
+    SNIPPET_MAX_CHARS: int = 200
 
     class Config:
-        env_file = str(
-            Path(
-                __file__
-            )
-            .resolve()
-            .parent.parent
-            / ".env"
-        )
+        env_file = str(Path(__file__).resolve().parent.parent / ".env")
 
-        env_file_encoding = (
-            "utf-8"
-        )
+        env_file_encoding = "utf-8"
 
-        case_sensitive = (
-            True
-        )
+        case_sensitive = True
 
         extra = "ignore"
 
@@ -171,79 +94,46 @@ class Settings(
     def gemini_api_keys_list(
         self,
     ) -> list[str]:
-        return [
-            key.strip()
-            for key in self.GEMINI_API_KEYS.split(
-                ","
-            )
-            if key.strip()
-        ]
+        return [key.strip() for key in self.GEMINI_API_KEYS.split(",") if key.strip()]
 
     @property
     def deepseek_api_keys_list(
         self,
     ) -> list[str]:
-        if (
-            self.DEEPSEEK_API_KEYS
-        ):
-            return [
-                key.strip()
-                for key in self.DEEPSEEK_API_KEYS.split(
-                    ","
-                )
-                if key.strip()
-            ]
+        if self.DEEPSEEK_API_KEYS:
+            return [key.strip() for key in self.DEEPSEEK_API_KEYS.split(",") if key.strip()]
 
-        if (
-            self.DEEPSEEK_API_KEY
-        ):
-            return [
-                self.DEEPSEEK_API_KEY
-            ]
+        if self.DEEPSEEK_API_KEY:
+            return [self.DEEPSEEK_API_KEY]
 
         return []
 
     # NEW dynamic today property
     @property
     def today(self) -> str:
-        return (
-            date.today()
-            .isoformat()
-        )
+        return date.today().isoformat()
 
     def validate_required_fields(
         self,
     ) -> None:
         missing = []
 
-        if (
-            not self.gemini_api_keys_list
-        ):
-            missing.append(
-                "GEMINI_API_KEYS"
-            )
+        if not self.gemini_api_keys_list:
+            missing.append("GEMINI_API_KEYS")
 
-        if (
-            not self.SUPABASE_URL
-        ):
-            missing.append(
-                "SUPABASE_URL"
-            )
+        if not self.REDIS_URL:
+            missing.append("REDIS_URL")
 
-        if (
-            not self.SUPABASE_SERVICE_ROLE_KEY
-        ):
-            missing.append(
-                "SUPABASE_SERVICE_ROLE_KEY"
-            )
+        if not self.SUPABASE_URL:
+            missing.append("SUPABASE_URL")
+
+        if missing and self.ENVIRONMENT == "production":
+            raise RuntimeError("Missing required environment variables: " + ", ".join(missing))
 
         if missing:
-            raise ValueError(
-                "Missing required environment variables: "
-                + ", ".join(
-                    missing
-                )
-            )
+            import logging
+
+            logging.warning(f"Missing optional env vars (fatal in production): {missing}")
 
 
 settings = Settings()
