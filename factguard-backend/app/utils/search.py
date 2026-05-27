@@ -1,5 +1,6 @@
 import asyncio
 import os
+from urllib.parse import quote
 
 import httpx
 
@@ -39,7 +40,7 @@ def _brightdata_search(
     try:
         payload = {
             "zone": "serp",
-            "url": "https://www.google.com/" f"search?q={query}" f"&num={max_results}",
+            "url": f"https://www.google.com/search?q={quote(query)}&num={max_results}",
             "format": "json",
             "country": "us",
         }

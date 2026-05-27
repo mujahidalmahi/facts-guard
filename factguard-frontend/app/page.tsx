@@ -112,7 +112,7 @@ export default function HomePage() {
   const Icon = config.icon;
 
   async function handleSubmit() {
-    const value = inputRef.current?.value.trim();
+    const value = query.trim();
     if (!value) {
       setError('Please enter a query to analyse.');
       return;

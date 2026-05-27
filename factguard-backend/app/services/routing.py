@@ -19,6 +19,7 @@ logger = get_logger("routing")
 
 
 _redis_client: aioredis.Redis | None = None
+_cb_failures: dict[str, list[float]] = {}
 
 
 async def _get_redis() -> aioredis.Redis | None:
@@ -65,8 +66,7 @@ async def _call_with_circuit_breaker(
             logger.warning(f"Circuit breaker '{name}' failure {new_failures}/{threshold}: {e}")
             return None
 
-    cb_failures: dict[str, list[float]] = {}
-    cb_state = cb_failures.get(name, [])
+    cb_state = _cb_failures.get(name, [])
     now = time.time()
     cb_state = [t for t in cb_state if now - t < cooldown]
     if len(cb_state) >= threshold:
@@ -76,12 +76,12 @@ async def _call_with_circuit_breaker(
     try:
         result = await func(*args)
         if result is not None and result != []:
-            cb_failures[name] = []
+            _cb_failures[name] = []
             return result
         raise ValueError(f"Empty result from {name}")
     except Exception as e:
         cb_state.append(now)
-        cb_failures[name] = cb_state
+        _cb_failures[name] = cb_state
         logger.warning(f"Circuit breaker '{name}' failure {len(cb_state)}/{threshold}: {e}")
         return None
 

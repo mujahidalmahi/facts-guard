@@ -1,5 +1,6 @@
 import json
 import re
+from urllib.parse import urlparse
 from datetime import datetime, timezone
 
 from app.logging_config import get_logger
@@ -67,15 +68,18 @@ LOW_DOMAIN_KEYWORDS = [
 
 def _domain_authority_score(url: str) -> float:
     """Score 0.0-1.0 for domain authority."""
-    url_lower = url.lower()
+    try:
+        domain = urlparse(url).netloc.lower()
+    except Exception:
+        return 0.5
     for kw in HIGH_DOMAIN_KEYWORDS:
-        if kw in url_lower:
+        if kw in domain:
             return 1.0
     for name in HIGH_OUTLET_NAMES:
-        if name in url_lower:
+        if name in domain:
             return 0.95
     for kw in LOW_DOMAIN_KEYWORDS:
-        if kw in url_lower:
+        if kw in domain:
             return 0.2
     return 0.5
 

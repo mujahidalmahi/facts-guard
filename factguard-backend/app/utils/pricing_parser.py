@@ -92,14 +92,19 @@ MERCHANT_PRIORITY: dict[str, int] = {
 }
 
 PRICE_PATTERNS = [
+    re.compile(r"\$\s*([\d,]+)\s*-\s*\$\s*([\d,]+)"),
     re.compile(r"\$[\s]*([\d,]+\.?\d*)"),
     re.compile(r"€[\s]*([\d,]+\.?\d*)"),
     re.compile(r"£[\s]*([\d,]+\.?\d*)"),
+    re.compile(r"₹[\s]*([\d,]+\.?\d*)"),
     re.compile(r"([\d,]+\.?\d*)\s*€"),
     re.compile(r"([\d,]+\.?\d*)\s*USD"),
+    re.compile(r"([\d,]+\.?\d*)\s*BDT"),
+    re.compile(r"([\d,]+\.?\d*)\s*INR"),
     re.compile(r"price[:\s]*\$?([\d,]+\.?\d*)", re.IGNORECASE),
-    re.compile(r"\$\s*([\d,]+)\s*-\s*\$\s*([\d,]+)"),
+    re.compile(r"price[:\s]*₹?([\d,]+\.?\d*)", re.IGNORECASE),
     re.compile(r"from\s*\$?([\d,]+\.?\d*)", re.IGNORECASE),
+    re.compile(r"from\s*₹?([\d,]+\.?\d*)", re.IGNORECASE),
 ]
 
 MODEL_SEPARATORS = re.compile(r"[,\(\)\[\]\-–—/]|\s+\d{4}\s*$")
@@ -119,7 +124,7 @@ def extract_price(text: str) -> Optional[float]:
                 groups = match.groups()
                 price_str = groups[0] if groups else match.group(0)
                 price_str = re.sub(r"[^\d.]", "", price_str.replace(",", ""))
-                if price_str and float(price_str) > 0:
+                if price_str is not None and float(price_str) >= 0:
                     return float(price_str)
             except (ValueError, IndexError):
                 continue
@@ -132,11 +137,17 @@ def classify_merchant(url: str) -> str:
         if domain_key in url_lower:
             return merchant_name
 
-    domain_match = re.search(r"https?://(?:www\.)?([^/]+)", url_lower)
-    if domain_match:
-        domain_parts = domain_match.group(1).split(".")
-        if len(domain_parts) >= 2:
-            return domain_parts[-2].title()
+    try:
+        from urllib.parse import urlparse
+        parsed = urlparse(url_lower)
+        domain = parsed.netloc or parsed.path.split("/")[0]
+        parts = domain.split(".")
+        if len(parts) >= 3 and parts[-1] in {"uk", "au", "jp", "br", "fr", "de", "nz", "kr", "in", "cn"}:
+            return parts[-3].title() if len(parts) >= 3 else parts[-2].title()
+        if len(parts) >= 2:
+            return parts[-2].title()
+    except Exception:
+        pass
     return "Unknown Merchant"
 
 
@@ -200,7 +211,7 @@ def cluster_listings(listings: list[dict]) -> list[dict]:
             else:
                 data["priceRange"] = f"${lo:,.2f} – ${hi:,.2f}"
         else:
-            data["min_price"] = float("inf")
+            data["min_price"] = None
             data["priceRange"] = "Price unavailable"
         del data["prices"]
         result.append(data)

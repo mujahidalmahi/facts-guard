@@ -158,18 +158,11 @@ export function CommandPalette() {
         keywords: ['theme', 'dark', 'light'],
       },
       {
-        id: 'clear',
-        label: 'Clear History',
-        icon: Trash2,
-        action: () => { close(); toast.info('History cleared'); },
-        keywords: ['clear', 'history', 'delete'],
-      },
-      {
-        id: 'copy',
-        label: 'Copy Current Result',
+        id: 'copy-link',
+        label: 'Copy Page Link',
         icon: Copy,
-        action: () => { navigator.clipboard?.writeText('Result copied'); close(); toast.success('Copied to clipboard'); },
-        keywords: ['copy', 'export'],
+        action: () => { navigator.clipboard?.writeText(window.location.href).catch(() => {}); close(); toast.success('Link copied'); },
+        keywords: ['copy', 'link', 'url'],
       },
     ];
 
@@ -205,9 +198,8 @@ export function CommandPalette() {
 
   const allItems = useMemo(() => groups.flatMap((g) => g.items), [groups]);
 
-  useEffect(() => {
-    setActiveIndex(0);
-  }, [query]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setActiveIndex(0); }, [query]);
 
   // Scroll active item into view
   useEffect(() => {
@@ -307,7 +299,7 @@ export function CommandPalette() {
                                   : 'border-l-2 border-transparent hover:bg-white/5'
                               }`}
                               style={{
-                                backgroundColor: isActive ? 'var(--color-accent-primary)/10' : 'transparent',
+                                backgroundColor: isActive ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
                               }}
                             >
                               <Icon className="w-4 h-4 shrink-0" style={{ color: item.id.startsWith('mode-') ? accent : '#7E8FAD' }} />

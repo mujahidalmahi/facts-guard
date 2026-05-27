@@ -59,29 +59,44 @@ function ListingCard({ listing, index, isBest }: { listing: CartListingEntry; in
       )}
 
       <div className="p-5">
-        <div className="flex items-center gap-2 mb-3">
-          <span className="data-label px-2 py-0.5 rounded font-bold"
-            style={{ color: trust.color, backgroundColor: trust.badgeBg, border: `1px solid ${trust.color}40` }}
-          >
-            {trust.label}
-          </span>
-          <span className="data-label px-2 py-0.5 rounded"
-            style={{
-              color: listing.condition === 'New' ? '#10B981' : listing.condition === 'Refurbished' ? '#F59E0B' : '#7E8FAD',
-              backgroundColor: listing.condition === 'New' ? 'rgba(16, 185, 129, 0.1)' : listing.condition === 'Refurbished' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(126, 143, 173, 0.1)',
-            }}
-          >
-            {listing.condition}
-          </span>
-        </div>
+        <div className="flex gap-3 mb-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="data-label px-2 py-0.5 rounded font-bold"
+                style={{ color: trust.color, backgroundColor: trust.badgeBg, border: `1px solid ${trust.color}40` }}
+              >
+                {trust.label}
+              </span>
+              <span className="data-label px-2 py-0.5 rounded"
+                style={{
+                  color: listing.condition === 'New' ? '#10B981' : listing.condition === 'Refurbished' ? '#F59E0B' : '#7E8FAD',
+                  backgroundColor: listing.condition === 'New' ? 'rgba(16, 185, 129, 0.1)' : listing.condition === 'Refurbished' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(126, 143, 173, 0.1)',
+                }}
+              >
+                {listing.condition}
+              </span>
+            </div>
 
-        <h3 className="text-sm font-semibold leading-tight line-clamp-2 mb-2" style={{ color: 'var(--color-text-primary)' }}>
-          {listing.title}
-        </h3>
+            <h3 className="text-sm font-semibold leading-tight line-clamp-2 mb-2" style={{ color: 'var(--color-text-primary)' }}>
+              {listing.title}
+            </h3>
 
-        <div className="text-xs mb-4 flex items-center gap-1" style={{ color: 'var(--color-text-secondary)' }}>
-          <ShoppingCart className="w-3 h-3" />
-          {listing.merchant}
+            <div className="text-xs flex items-center gap-1" style={{ color: 'var(--color-text-secondary)' }}>
+              <ShoppingCart className="w-3 h-3" />
+              {listing.merchant}
+            </div>
+
+            {listing.rating && (
+              <div className="text-xs mt-1 flex items-center gap-1" style={{ color: '#F59E0B' }}>
+                <Star className="w-3 h-3 fill-current" /> {listing.rating}
+              </div>
+            )}
+          </div>
+          {listing.image && (
+            <div className="shrink-0 w-20 h-20 rounded-lg overflow-hidden" style={{ backgroundColor: 'var(--color-bg-elevated)' }}>
+              <img src={listing.image} alt="" className="w-full h-full object-contain" loading="lazy" />
+            </div>
+          )}
         </div>
 
         <div className="flex items-end justify-between mb-4">
@@ -147,6 +162,25 @@ export function CartResultView({ data }: { data: CartResult }) {
       return (a.price ?? 0) - (b.price ?? 0);
     });
   }, [listings]);
+
+  if (listings.length === 0) {
+    return (
+      <div className="p-6 max-w-7xl mx-auto">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
+          <div className="data-label mb-2 flex items-center gap-2">
+            <ShoppingCart className="w-3 h-3" style={{ color: '#06B6D4' }} />
+            CARTGUARD ANALYSIS
+          </div>
+          <h1 className="text-3xl font-bold mb-4" style={{ color: 'var(--color-text-primary)', fontFamily: 'var(--font-sora)' }}>
+            {data.product || 'Product'}
+          </h1>
+          <div className="rounded-2xl p-8 text-center" style={{ backgroundColor: 'var(--color-bg-surface)', border: '1px solid var(--color-border-default)' }}>
+            <p style={{ color: 'var(--color-text-secondary)' }}>No listings found for this product.</p>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
 
   const best = sorted.find((l) => l.trust_level !== 'RED') || sorted[0];
   const prices = listings.map((l) => l.price ?? 0);

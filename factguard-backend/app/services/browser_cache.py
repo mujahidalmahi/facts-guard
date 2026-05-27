@@ -16,13 +16,10 @@ async def get_cached_browser_extract(
     url: str,
 ) -> str | None:
     try:
-        client = _get_client()
+        client = await _get_client()
         if client is None:
             return None
-        data = await asyncio.to_thread(
-            client.get,
-            _url_cache_key(url),
-        )
+        data = await client.get(_url_cache_key(url))
         return data if data else None
     except Exception as e:
         logger.warning(f"Redis get_browser_extract failed: {e}")
@@ -34,11 +31,10 @@ async def set_cached_browser_extract(
     text: str,
 ) -> None:
     try:
-        client = _get_client()
+        client = await _get_client()
         if client is None:
             return
-        await asyncio.to_thread(
-            client.setex,
+        await client.setex(
             _url_cache_key(url),
             settings.CACHE_TTL_BROWSER,
             text,

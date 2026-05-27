@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useEffect, useState, useMemo } from 'react';
+import { use, useEffect, useState, useMemo, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShieldCheck, AlertOctagon, HelpCircle, CheckCircle2, AlertTriangle, Copy, Share2, ChevronDown, ExternalLink, ArrowUpDown } from 'lucide-react';
@@ -101,33 +101,51 @@ export default function ResultPage({ params }: { params: Promise<{ jobId: string
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<'credibility' | 'relevance'>('relevance');
   const [showAllSources, setShowAllSources] = useState(false);
+  const mountedRef = useRef(true);
+
+  const sortedSources = useMemo(() => {
+    const srcs = data?.sources ?? [];
+    const copy = [...srcs];
+    copy.sort((a: Source, b: Source) => {
+      if (sortKey === 'credibility') {
+        const order = { High: 3, Medium: 2, Low: 1 };
+        return order[b.credibility] - order[a.credibility];
+      }
+      return b.relevance - a.relevance;
+    });
+    return copy;
+  }, [data?.sources, sortKey]);
 
   useEffect(() => {
+    mountedRef.current = true;
     let attempts = 0;
     const MAX = 40;
     const INTERVAL = 1500;
     let timer: ReturnType<typeof setTimeout> | undefined;
 
     async function poll() {
+      if (!mountedRef.current) return;
       attempts++;
-      if (attempts > MAX) { setError(true); return; }
+      if (attempts > MAX) { mountedRef.current && setError(true); return; }
       try {
         const res = await fetch(`${API_URL}${endpoint}/${jobId}?mode=${mode}`);
+        if (!mountedRef.current) return;
         if (!res.ok) throw new Error(String(res.status));
         const result = await res.json();
+        if (!mountedRef.current) return;
         if (result.status === 'processing') {
           timer = setTimeout(poll, INTERVAL);
           return;
         }
-        if (result.status === 'error') { setError(true); return; }
-        setData(result);
+        if (result.status === 'error') { mountedRef.current && setError(true); return; }
+        mountedRef.current && setData(result);
       } catch (err) {
         console.error(err);
-        setError(true);
+        mountedRef.current && setError(true);
       }
     }
     poll();
-    return () => { if (timer) clearTimeout(timer); };
+    return () => { mountedRef.current = false; if (timer) clearTimeout(timer); };
   }, [jobId, endpoint, mode]);
 
   const sortedSources = useMemo(() => {
@@ -219,21 +237,25 @@ export default function ResultPage({ params }: { params: Promise<{ jobId: string
 
   const visibleSources = showAllSources ? sortedSources : sortedSources.slice(0, 10);
 
+  /* eslint-disable react-hooks/purity -- relativeDate is a display-only formatter */
   const relativeDate = (iso: string) => {
-    const diff = (Date.now() - new Date(iso).getTime()) / 1000;
+    const ts = new Date(iso).getTime();
+    if (isNaN(ts)) return '';
+    const diff = (Date.now() - ts) / 1000;
     if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
     if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
     return `${Math.floor(diff / 86400)}d ago`;
   };
+  /* eslint-enable react-hooks/purity */
 
   const handleCopySummary = () => {
     const text = `FactGuard Analysis\nVerdict: ${data.verdict} (${data.confidence} confidence)\n\n${data.summary}`;
-    navigator.clipboard?.writeText(text);
+    navigator.clipboard?.writeText(text).catch(() => {});
     toast.success('Copied to clipboard', 'Summary copied with verdict');
   };
 
   const handleShare = () => {
-    navigator.clipboard?.writeText(window.location.href);
+    navigator.clipboard?.writeText(window.location.href).catch(() => {});
     toast.info('Link copied', 'Share this analysis link');
   };
 
@@ -414,7 +436,7 @@ export default function ResultPage({ params }: { params: Promise<{ jobId: string
                               <div className="w-6 h-6 rounded flex items-center justify-center text-[10px] font-mono shrink-0"
                                 style={{ backgroundColor: 'var(--color-bg-elevated)', color: 'var(--color-text-secondary)' }}
                               >
-                                {(source.url ? new URL(source.url).hostname[0] : 'S').toUpperCase()}
+                                {(() => { try { return source.url ? new URL(source.url).hostname[0].toUpperCase() : 'S' } catch { return 'S' } })()}
                               </div>
                               <div className="min-w-0 flex-1">
                                 <div className="text-sm line-clamp-1" style={{ color: 'var(--color-text-primary)' }}>
@@ -427,7 +449,7 @@ export default function ResultPage({ params }: { params: Promise<{ jobId: string
                                     </span>
                                   )}
                                 </div>
-                                <div className="data-label mt-0.5">{source.url ? new URL(source.url).hostname : ''}</div>
+                                <div className="data-label mt-0.5">{(() => { try { return source.url ? new URL(source.url).hostname : '' } catch { return '' } })()}</div>
                               </div>
                             </div>
                           </td>

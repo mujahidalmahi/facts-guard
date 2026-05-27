@@ -1,10 +1,24 @@
 import asyncio
+import math
 from typing import Any
 
 from app.dependencies import get_supabase_service
 from app.logging_config import get_logger
 
 logger = get_logger("db")
+
+
+def _sanitize(obj: Any) -> Any:
+    """Recursively replace inf/-inf/NaN with None for JSON safety."""
+    if isinstance(obj, float):
+        if math.isinf(obj) or math.isnan(obj):
+            return None
+        return obj
+    if isinstance(obj, dict):
+        return {k: _sanitize(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_sanitize(v) for v in obj]
+    return obj
 
 
 def _get_client():
@@ -45,12 +59,14 @@ async def _db_call(callback):
 
 
 async def insert(table: str, data: dict | list[dict]) -> Any:
-    return await _db_call(lambda: _get_client().table(table).insert(data).execute())
+    clean = _sanitize(data)
+    return await _db_call(lambda: _get_client().table(table).insert(clean).execute())
 
 
 async def update(table: str, data: dict, eq_field: str, eq_value: str) -> Any:
+    clean = _sanitize(data)
     return await _db_call(
-        lambda: _get_client().table(table).update(data).eq(eq_field, eq_value).execute()
+        lambda: _get_client().table(table).update(clean).eq(eq_field, eq_value).execute()
     )
 
 

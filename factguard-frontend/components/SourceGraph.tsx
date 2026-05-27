@@ -19,7 +19,7 @@ export default function SourceGraph({ sources }: { sources: Source[] }) {
     const cx = 180, cy = 120;
     const angleStep = (2 * Math.PI) / sources.length;
     return sources.map((s, i) => {
-      const tier = (s as any).tier ?? 4;
+      const tier = s.tier ?? 4;
       const radius = 22 - (tier - 1) * 4;
       return {
         id: s.url,

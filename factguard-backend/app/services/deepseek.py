@@ -144,13 +144,11 @@ async def deepseek_financial_analysis(
 ) -> dict:
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-    (
-        build_search_context(
-            json.loads(context) if isinstance(context, str) and context.startswith("[") else []
-        )
-        if False
-        else context
-    )
+    if isinstance(context, str) and context.startswith("["):
+        try:
+            context = build_search_context(json.loads(context))
+        except json.JSONDecodeError:
+            pass
 
     user_prompt = FINANCIAL_USER_PROMPT.format(
         today=today,

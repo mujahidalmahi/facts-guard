@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useState, useEffect } from 'react';
+import { createContext, useCallback, useContext, useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, XCircle, Info, AlertTriangle, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -105,10 +105,14 @@ export function ToastProvider({ children }: { children?: React.ReactNode }) {
 }
 
 function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
+  const onCloseRef = useRef(onClose);
   useEffect(() => {
-    const timer = setTimeout(onClose, toast.duration);
+    onCloseRef.current = onClose;
+  }, [onClose]);
+  useEffect(() => {
+    const timer = setTimeout(() => onCloseRef.current(), toast.duration);
     return () => clearTimeout(timer);
-  }, [toast.duration, onClose]);
+  }, [toast.duration]);
 
   const Icon = ICONS[toast.type];
   const colors = COLORS[toast.type];

@@ -216,6 +216,8 @@ export interface CartListingEntry {
   counterfeit_risk: 'High' | 'Medium' | 'Low' | 'None';
   condition: 'New' | 'Refurbished' | 'Used' | 'Unknown';
   in_stock: boolean;
+  image?: string | null;
+  rating?: string | null;
 }
 
 export interface CartAnalysis {

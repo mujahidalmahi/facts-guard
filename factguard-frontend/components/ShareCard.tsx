@@ -1,7 +1,6 @@
 'use client';
 
 import {
-  useEffect,
   useState,
 } from 'react';
 
@@ -17,11 +16,6 @@ export function ShareCard({
   jobId,
 }: ShareCardProps) {
   const [
-    url,
-    setUrl,
-  ] = useState('');
-
-  const [
     copied,
     setCopied,
   ] = useState(false);
@@ -34,14 +28,7 @@ export function ShareCard({
       'mode'
     ) || 'verify';
 
-  useEffect(() => {
-    setUrl(
-      `${window.location.origin}/result/${jobId}?mode=${mode}`
-    );
-  }, [
-    jobId,
-    mode,
-  ]);
+  const url = `${window.location.origin}/result/${jobId}?mode=${mode}`;
 
   async function copy() {
     try {

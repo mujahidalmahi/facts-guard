@@ -47,6 +47,8 @@ async def create_claim(claim_text: str, job_id: str) -> str:
                 "status": STATUS_PROCESSING,
             },
         )
+        if not result or not result.data:
+            raise ValueError("No data returned from database")
         claim_id = result.data[0]["id"]
         logger.debug(f"Claim created: {claim_id}")
         return claim_id
@@ -70,6 +72,8 @@ async def save_result(claim_id: str, data: dict[str, Any], job_id: str | None = 
         if job_id:
             insert_data["job_id"] = job_id
         result = await insert("results", insert_data)
+        if not result or not result.data:
+            raise ValueError("No data returned from database")
         result_id = result.data[0]["id"]
         logger.debug(f"Result saved: {result_id}")
         return result_id

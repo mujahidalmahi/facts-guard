@@ -209,6 +209,26 @@ async def unlocker_scrape(url: str) -> Optional[str]:
         return None
 
 
+async def scrape_page_full(url: str) -> Optional[str]:
+    """Fetch full HTML of a page via Web Unlocker (no truncation)."""
+    api_key = _get_api_key()
+    if not api_key:
+        return None
+    try:
+        payload = {"zone": "unlocker", "url": url, "format": "raw"}
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(
+                BRIGHTDATA_ENDPOINT, json=payload, headers=_headers()
+            )
+            resp.raise_for_status()
+            html = resp.text
+        logger.info(f"scrape_page_full: {url} ({len(html)} chars)")
+        return html
+    except Exception as e:
+        logger.warning(f"scrape_page_full failed for {url}: {e}")
+        return None
+
+
 async def browser_render(url: str) -> Optional[str]:
     """Scraping Browser via BrightData CDP WebSocket proxy."""
     wss_url = settings.BRIGHTDATA_WSS

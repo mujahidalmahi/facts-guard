@@ -196,7 +196,7 @@ api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 async def require_api_key(key: str = Security(api_key_header)):
     if not settings.API_KEYS:
         return key
-    valid_keys = set(settings.API_KEYS.split(","))
+    valid_keys = set(k for k in settings.API_KEYS.split(",") if k)
     if key not in valid_keys:
         raise HTTPException(
             status_code=401,

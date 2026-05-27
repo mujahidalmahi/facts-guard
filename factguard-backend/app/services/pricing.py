@@ -1,3 +1,5 @@
+import asyncio
+
 from app.logging_config import get_logger
 from app.services.supabase_db import (
     save_cart_result,
@@ -27,6 +29,9 @@ from app.services.cache import (
 )
 from app.services.cart_ai import (
     enrich_cart_listings,
+)
+from app.services.marketplace_scraper import (
+    search_all_marketplaces,
 )
 from app.utils.pricing_parser import (
     classify_merchant,
@@ -78,9 +83,16 @@ def _build_ai_analysis(
     ai_enrichment: dict | None,
     listings_data: list[dict],
 ) -> dict:
-    prices = [x.get("price") for x in listings_data if x.get("price") is not None]
-    low_price = str(min(prices, default=0))
-    high_price = str(max(prices, default=0))
+    prices = []
+    for x in listings_data:
+        p = x.get("price")
+        if p is not None:
+            try:
+                prices.append(float(p))
+            except (ValueError, TypeError):
+                pass
+    low_price = str(min(prices, default=0.0))
+    high_price = str(max(prices, default=0.0))
     product_name = listings_data[0].get("title", "") if listings_data else ""
 
     if not ai_enrichment:
@@ -113,8 +125,8 @@ def _build_ai_analysis(
         "product_name": product_name,
         "msrp": None,
         "fair_market_range": {
-            "min": str(ai_enrichment.get("price_range", {}).get("low", low_price)),
-            "max": str(ai_enrichment.get("price_range", {}).get("high", high_price)),
+            "min": str((ai_enrichment.get("price_range") or {}).get("low", low_price)),
+            "max": str((ai_enrichment.get("price_range") or {}).get("high", high_price)),
             "currency": "USD",
         },
         "best_deal": {
@@ -177,6 +189,8 @@ def _listing_to_response(
             "Unknown",
         ),
         "in_stock": True,
+        "image": listing.get("image"),
+        "rating": listing.get("rating"),
     }
 
 
@@ -194,6 +208,8 @@ async def create_query(
             },
         )
 
+        if not result or not result.data:
+            raise ValueError("No data returned from database")
         query_id = result.data[0]["id"]
 
         logger.debug(f"Price query created: " f"{query_id}")
@@ -378,50 +394,63 @@ async def fetch_product_prices(
 ]:
     search_query = f"{product_name} " f"price buy online"
 
-    results = await search_claim(
-        search_query,
-        max_results=10,
+    marketplace_task = asyncio.wait_for(
+        search_all_marketplaces(product_name), timeout=40
+    )
+    serp_task = asyncio.wait_for(
+        search_claim(search_query, max_results=10), timeout=40
     )
 
-    seen_urls = set()
-    raw_listings = []
+    (marketplace_results, serp_results) = await asyncio.gather(
+        marketplace_task, serp_task, return_exceptions=True
+    )
 
-    for r in results:
+    if isinstance(marketplace_results, Exception):
+        logger.warning(f"Marketplace search failed: {marketplace_results}")
+        marketplace_results = []
+    if isinstance(serp_results, Exception):
+        logger.warning(f"SERP search failed: {serp_results}")
+        serp_results = []
+
+    seen_urls: set[str] = set()
+    raw_listings: list[dict] = []
+
+    for listing in marketplace_results:
+        url = listing.get("url", "")
+        key = url.rstrip("/").lower()
+        if key and key not in seen_urls:
+            seen_urls.add(key)
+            if listing.get("merchant") in ("Unknown", ""):
+                listing["merchant"] = classify_merchant(url)
+            raw_listings.append(listing)
+
+    for r in serp_results:
         url = r.get("url", "")
+        key = url.rstrip("/").lower()
+        if key and key not in seen_urls:
+            seen_urls.add(key)
 
-        if url in seen_urls:
-            continue
+            snippet = r.get("snippet", "")
+            title = r.get("title", "")
 
-        seen_urls.add(url)
+            price = extract_price(snippet) or extract_price(title)
+            merchant = classify_merchant(url)
+            model_name = extract_model_name(title)
 
-        snippet = r.get(
-            "snippet",
-            "",
-        )
-
-        title = r.get(
-            "title",
-            "",
-        )
-
-        price = extract_price(snippet) or extract_price(title)
-
-        merchant = classify_merchant(url)
-
-        model_name = extract_model_name(title)
-
-        raw_listings.append(
-            {
-                "title": title,
-                "price": price,
-                "currency": "USD",
-                "merchant": merchant,
-                "url": url,
-                "image": None,
-                "condition": None,
-                "model_name": model_name,
-            }
-        )
+            raw_listings.append(
+                {
+                    "title": title,
+                    "price": price,
+                    "currency": "USD",
+                    "merchant": merchant,
+                    "url": url,
+                    "image": None,
+                    "condition": None,
+                    "model_name": model_name,
+                    "rating": None,
+                    "source": r.get("source", "serp"),
+                }
+            )
 
     sorted_listings = sort_listings(raw_listings)
 
@@ -479,11 +508,15 @@ async def process_price_check(
                 },
             )
 
-        ai_enrichment = await enrich_cart_listings(
-            product_name,
-            listings,
-            job_id,
-        )
+        try:
+            ai_enrichment = await enrich_cart_listings(
+                product_name,
+                listings,
+                job_id,
+            )
+        except Exception as e:
+            logger.warning(f"AI enrichment failed (non-fatal): {e}")
+            ai_enrichment = None
 
         await set_progress(
             job_id,
@@ -495,25 +528,31 @@ async def process_price_check(
             listings,
         )
 
-        await update(
-            "product_queries",
-            {
-                "status": STATUS_DONE,
-                "variants_data": variants,
-                "ai_enrichment": ai_enrichment,
-            },
-            "id",
-            query_id,
-        )
+        try:
+            await update(
+                "product_queries",
+                {
+                    "status": STATUS_DONE,
+                    "variants_data": variants,
+                    "ai_enrichment": ai_enrichment,
+                },
+                "id",
+                query_id,
+            )
+        except Exception as e:
+            logger.warning(f"status update failed (non-fatal): {e}")
 
-        await push_claim_to_history(
-            {
-                "jobId": job_id,
-                "claim": f"[CART] {product_name}",
-                "status": STATUS_DONE,
-                "createdAt": datetime.now(timezone.utc).isoformat(),
-            }
-        )
+        try:
+            await push_claim_to_history(
+                {
+                    "jobId": job_id,
+                    "claim": f"[CART] {product_name}",
+                    "status": STATUS_DONE,
+                    "createdAt": datetime.now(timezone.utc).isoformat(),
+                }
+            )
+        except Exception as e:
+            logger.warning(f"push_claim_to_history failed (non-fatal): {e}")
 
         logger.info(
             f"Price check " f"{query_id} " f"completed with " f"{len(listings)} " f"listings"

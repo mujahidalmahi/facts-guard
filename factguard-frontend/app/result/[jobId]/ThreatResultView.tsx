@@ -28,7 +28,9 @@ const STATUS_META: Record<string, { color: string; label: string; pulse: boolean
 };
 
 function relativeTime(iso: string): string {
-  const diff = (Date.now() - new Date(iso).getTime()) / 1000;
+  const ts = new Date(iso).getTime();
+  if (isNaN(ts)) return '';
+  const diff = (Date.now() - ts) / 1000;
   if (diff < 60) return 'just now';
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
@@ -70,7 +72,7 @@ THREAT DETAILS:
 
 ${threats.map((t, i) => `${i + 1}. [${t.severity.toUpperCase()}] ${t.title}
    Type: ${t.threat_type}
-   Status: t.alert_status
+   Status: ${t.alert_status}
    Confidence: ${t.confidence}%
    Source: ${t.source_domain}
    Detected: ${new Date(t.detected_at).toLocaleString()}

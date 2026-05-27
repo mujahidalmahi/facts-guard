@@ -5,6 +5,7 @@ from app.services.supabase_db import (
 )
 from datetime import (
     datetime,
+    timezone,
 )
 
 from app.logging_config import (
@@ -194,7 +195,7 @@ async def process_financial_analysis(
                     "credibility": "Medium",
                     "stance": ai_analysis.get("price_trend", "Neutral"),
                     "summary": (r.get("snippet", "") or "")[:200],
-                    "date": datetime.now().strftime("%Y-%m-%d"),
+                    "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
                 }
                 if url in browser_texts:
                     source["extraction"] = "browser"
@@ -207,7 +208,7 @@ async def process_financial_analysis(
                     "credibility": "Medium",
                     "stance": ai_analysis.get("price_trend", "Neutral"),
                     "summary": "Analysis based on available data.",
-                    "date": datetime.now().strftime("%Y-%m-%d"),
+                    "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
                 }
             )
 
@@ -228,7 +229,7 @@ async def process_financial_analysis(
                 "jobId": job_id,
                 "claim": f"[FINANCIAL] {query}",
                 "status": STATUS_DONE,
-                "createdAt": datetime.now().isoformat(),
+                "createdAt": datetime.now(timezone.utc).isoformat(),
             }
         )
 

@@ -29,28 +29,34 @@ const POLL_PATHS: Record<string, string> = {
 
 export function useJobPolling(jobId: string, resultPath: string, progressSteps: string[], mode: string = 'verify') {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // eslint-disable-next-line react-hooks/purity
   const startedRef = useRef(Date.now())
   const intervalRef = useRef(INITIAL_INTERVAL)
+  const mountedRef = useRef(true)
   const [progress, setProgress] = useState('Processing...')
   const [status, setStatus] = useState<string>('processing')
   const pollPath = POLL_PATHS[mode] ?? '/result'
 
   useEffect(() => {
+    mountedRef.current = true
     startedRef.current = Date.now()
     intervalRef.current = INITIAL_INTERVAL
 
     async function poll() {
+      if (!mountedRef.current) return
       if (Date.now() - startedRef.current > MAX_POLL_MS) {
-        setProgress('timeout')
-        setStatus('timeout')
+        mountedRef.current && setProgress('timeout')
+        mountedRef.current && setStatus('timeout')
         return
       }
 
       try {
         const res = await fetch(`${API_URL}${pollPath}/${jobId}?mode=${mode}`)
+        if (!mountedRef.current) return
         if (!res.ok) return
 
         const data = await res.json()
+        if (!mountedRef.current) return
 
         if (data.progress) {
           setProgress(data.progress)
@@ -71,6 +77,7 @@ export function useJobPolling(jobId: string, resultPath: string, progressSteps: 
     timerRef.current = setTimeout(poll, INITIAL_INTERVAL)
 
     return () => {
+      mountedRef.current = false
       if (timerRef.current) {
         clearTimeout(timerRef.current)
       }

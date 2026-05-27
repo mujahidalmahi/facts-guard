@@ -17,15 +17,15 @@ router = APIRouter()
 
 def _enrich_claim(claim: dict) -> dict:
     text = claim.get("claim_text", "") or claim.get("claim", "")
-    if text.startswith("[FIN]"):
+    if text.startswith("[FINANCIAL]"):
         mode = "financial"
-        display = text.replace("[FIN] ", "")
+        display = text.replace("[FINANCIAL] ", "")
     elif text.startswith("[CART]"):
         mode = "cart"
         display = text.replace("[CART] ", "")
-    elif text.startswith("[FINANCIAL]"):
+    elif text.startswith("[FIN]"):
         mode = "financial"
-        display = text.replace("[FINANCIAL] ", "")
+        display = text.replace("[FIN] ", "")
     else:
         mode = "verify"
         display = text
