@@ -130,6 +130,21 @@ export default function ResultPage({ params }: { params: Promise<{ jobId: string
     return () => { if (timer) clearTimeout(timer); };
   }, [jobId, endpoint, mode]);
 
+  const sortedSources = useMemo(() => {
+    if (!data?.sources) return [];
+    const copy = [...data.sources];
+    copy.sort((a: Source, b: Source) => {
+      if (a._hallucinated && !b._hallucinated) return 1;
+      if (!a._hallucinated && b._hallucinated) return -1;
+      if (sortKey === 'credibility') {
+        const order = { High: 3, Medium: 2, Low: 1 };
+        return (order[b.credibility] ?? 0) - (order[a.credibility] ?? 0);
+      }
+      return b.relevance - a.relevance;
+    });
+    return copy;
+  }, [data?.sources, sortKey]);
+
   if (error) {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center gap-4 px-6"
@@ -191,27 +206,16 @@ export default function ResultPage({ params }: { params: Promise<{ jobId: string
     unverified_anecdote: { emoji: '💬', label: 'Unverified Anecdote' },
   };
 
-  const supports = data.supports ?? 0;
-  const contradicts = data.contradicts ?? 0;
-  const neutral = data.neutral ?? 0;
-  const totalSources = supports + contradicts + neutral;
+  const validSources = (data.sources ?? []).filter((s: Source) => !s._hallucinated);
+  const hallucinatedSources = (data.sources ?? []).filter((s: Source) => s._hallucinated);
+  const supports = validSources.filter((s: Source) => s.stance === 'supports').length;
+  const contradicts = validSources.filter((s: Source) => s.stance === 'contradicts').length;
+  const neutral = validSources.filter((s: Source) => s.stance === 'neutral').length;
   const verdictCfg = VERDICT_CONFIG[data.verdict] ?? VERDICT_CONFIG.Unverified;
   const VerdictIcon = verdictCfg.icon;
 
   const diversityPercent = data.source_diversity === 'High' ? 92 : data.source_diversity === 'Medium' ? 60 : 30;
   const diversityColor = data.source_diversity === 'High' ? '#4F46E5' : data.source_diversity === 'Medium' ? '#F59E0B' : '#EF4444';
-
-  const sortedSources = useMemo(() => {
-    const copy = [...(data.sources ?? [])];
-    copy.sort((a: Source, b: Source) => {
-      if (sortKey === 'credibility') {
-        const order = { High: 3, Medium: 2, Low: 1 };
-        return order[b.credibility] - order[a.credibility];
-      }
-      return b.relevance - a.relevance;
-    });
-    return copy;
-  }, [data.sources, sortKey]);
 
   const visibleSources = showAllSources ? sortedSources : sortedSources.slice(0, 10);
 
@@ -340,7 +344,12 @@ export default function ResultPage({ params }: { params: Promise<{ jobId: string
               <div className="px-4 py-3 border-b border-[var(--color-border-subtle)] flex items-center justify-between">
                 <div>
                   <div className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>Evidential Sources</div>
-                  <div className="data-label mt-0.5">{data.sources.length} sources analysed</div>
+                  <div className="data-label mt-0.5">{validSources.length + hallucinatedSources.length} sources analysed</div>
+                    {hallucinatedSources.length > 0 && (
+                      <div className="data-label mt-0.5" style={{ color: 'var(--color-accent-red)' }}>
+                        {hallucinatedSources.length} failed URL validation
+                      </div>
+                    )}
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="data-label">Sort by:</span>
@@ -408,7 +417,16 @@ export default function ResultPage({ params }: { params: Promise<{ jobId: string
                                 {(source.url ? new URL(source.url).hostname[0] : 'S').toUpperCase()}
                               </div>
                               <div className="min-w-0 flex-1">
-                                <div className="text-sm line-clamp-1" style={{ color: 'var(--color-text-primary)' }}>{source.title}</div>
+                                <div className="text-sm line-clamp-1" style={{ color: 'var(--color-text-primary)' }}>
+                                  {source.title}
+                                  {source._hallucinated && (
+                                    <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase"
+                                      style={{ backgroundColor: 'rgba(239,68,68,0.15)', color: '#EF4444' }}
+                                    >
+                                      FAILED
+                                    </span>
+                                  )}
+                                </div>
                                 <div className="data-label mt-0.5">{source.url ? new URL(source.url).hostname : ''}</div>
                               </div>
                             </div>

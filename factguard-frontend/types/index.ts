@@ -35,6 +35,7 @@ export interface Source {
   relevance: number;
   summary: string;
   quote?: string;
+  _hallucinated?: boolean;
 }
 
 export interface VerifyResult {

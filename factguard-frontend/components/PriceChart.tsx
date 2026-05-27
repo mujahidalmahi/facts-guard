@@ -47,7 +47,7 @@ export function PriceChart({ data }: { data: GraphData }) {
         </div>
       </div>
 
-      <div className="h-60 w-full min-w-0">
+      <div className="h-60 w-full" style={{ minWidth: 280, minHeight: 0 }}>
           <ResponsiveContainer width="100%" height={240}>
             <ComposedChart data={data.data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
               <defs>

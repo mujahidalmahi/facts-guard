@@ -121,7 +121,7 @@ export function Sidebar() {
       initial={false}
       animate={{ width: collapsed ? 64 : 240 }}
       transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-      className="fixed left-0 top-0 bottom-0 z-30 flex flex-col border-r border-[var(--color-border-subtle)] backdrop-blur-xl"
+      className="sticky top-0 h-screen z-30 flex flex-col border-r border-[var(--color-border-subtle)] backdrop-blur-xl relative"
       style={{ backgroundColor: 'rgba(10, 22, 40, 0.9)' }}
     >
       {/* Wordmark */}
@@ -158,7 +158,7 @@ export function Sidebar() {
                 key={mode}
                 onClick={() => navigateToMode(mode)}
                 aria-label={`Switch to ${meta.label} mode`}
-                className={`w-full flex items-center gap-3 px-2 py-2.5 rounded-lg transition-all group relative ${
+                className={`w-full flex items-center ${collapsed ? 'justify-center' : ''} gap-3 px-2 py-2.5 rounded-lg transition-all group relative ${
                   isActive ? 'bg-[var(--color-accent-primary)]/5' : 'hover:bg-[var(--color-bg-elevated)]'
                 }`}
                 title={collapsed ? meta.label : undefined}
@@ -315,10 +315,12 @@ export function Sidebar() {
       </div>
 
       {/* Bottom controls */}
-      <div className="p-3 border-t border-[var(--color-border-subtle)] flex items-center gap-1">
+      <div className={`border-t border-[var(--color-border-subtle)] flex items-center ${collapsed ? 'p-1.5 justify-center gap-0.5' : 'p-3 gap-1'}`}>
         <button
           onClick={triggerCommandPalette}
-          className="flex-1 flex items-center justify-center gap-2 px-2 py-2 rounded-lg hover:bg-[var(--color-bg-elevated)] transition-colors"
+          className={`flex items-center justify-center rounded-lg hover:bg-[var(--color-bg-elevated)] transition-colors ${
+            collapsed ? 'p-1.5' : 'flex-1 px-2 py-2 gap-2'
+          }`}
           aria-label="Open command palette"
           title={collapsed ? 'Command palette' : undefined}
         >
@@ -327,7 +329,9 @@ export function Sidebar() {
         </button>
         <button
           onClick={toggleTheme}
-          className="flex-1 flex items-center justify-center gap-2 px-2 py-2 rounded-lg hover:bg-[var(--color-bg-elevated)] transition-colors"
+          className={`flex items-center justify-center rounded-lg hover:bg-[var(--color-bg-elevated)] transition-colors ${
+            collapsed ? 'p-1.5' : 'flex-1 px-2 py-2 gap-2'
+          }`}
           aria-label="Toggle theme"
           title={collapsed ? 'Toggle theme' : undefined}
         >
@@ -347,11 +351,12 @@ export function Sidebar() {
       {/* Collapse toggle */}
       <button
         onClick={handleCollapse}
-        className="absolute -right-3 top-20 w-6 h-6 rounded-full flex items-center justify-center transition-colors"
+        className="absolute -right-3 top-20 w-6 h-6 rounded-full flex items-center justify-center transition-all hover:scale-110"
         style={{
           backgroundColor: 'var(--color-bg-surface)',
           border: '1px solid var(--color-border-default)',
           color: 'var(--color-text-secondary)',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
         }}
         aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
       >

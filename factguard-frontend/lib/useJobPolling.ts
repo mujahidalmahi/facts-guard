@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
-const MAX_POLL_MS = 90_000
+const MAX_POLL_MS = 150_000
 const INITIAL_INTERVAL = 1000
 const MAX_INTERVAL = 5000
 

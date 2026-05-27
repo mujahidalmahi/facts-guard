@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from datetime import (
     datetime,
@@ -53,7 +54,30 @@ logger = get_logger("verify")
 router = APIRouter()
 
 
+PROCESS_TIMEOUT = 120
+
+
 async def process_claim(
+    claim_id: str,
+    claim_text: str,
+    job_id: str,
+):
+    try:
+        await asyncio.wait_for(
+            _process(claim_id, claim_text, job_id),
+            timeout=PROCESS_TIMEOUT,
+        )
+    except asyncio.TimeoutError:
+        logger.error(f"Claim processing timed out after {PROCESS_TIMEOUT}s")
+        await set_progress(job_id, "Processing timed out")
+        await update_claim_status(claim_id, STATUS_ERROR)
+    except Exception as e:
+        logger.error(f"Failed: {e}")
+        await set_progress(job_id, "Failed")
+        await update_claim_status(claim_id, STATUS_ERROR)
+
+
+async def _process(
     claim_id: str,
     claim_text: str,
     job_id: str,

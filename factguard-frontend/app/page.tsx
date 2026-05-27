@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Shield, TrendingUp, AlertTriangle, ShoppingCart, Send, AlertCircle, X, Sparkles } from 'lucide-react';
@@ -98,9 +98,12 @@ export default function HomePage() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showSplash, setShowSplash] =
-    useState(() => !sessionStorage.getItem('splashShown'));
+  const [showSplash, setShowSplash] = useState<boolean | null>(null);
   const [query, setQuery] = useState('');
+
+  useEffect(() => {
+    setShowSplash(!sessionStorage.getItem('splashShown'));
+  }, []);
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const router = useRouter();
@@ -166,6 +169,8 @@ export default function HomePage() {
       handleSubmit();
     }
   };
+
+  if (showSplash === null) return null;
 
   if (showSplash)
     return (

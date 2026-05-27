@@ -84,7 +84,7 @@ export function FinancialResultView({ data }: { data: FinancialResult }) {
               )}
             </div>
 
-            <div className="h-[280px]">
+            <div className="h-[280px] w-full min-w-0">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={graph_data?.data ?? []} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <defs>

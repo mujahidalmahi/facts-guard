@@ -52,7 +52,10 @@ function LoadingContent() {
   const fallbackSteps = useMemo(() => FALLBACK_STEPS[mode] ?? FALLBACK_STEPS.verify, [mode]);
 
   const { progress, pct, status } = useJobPolling(jobId, 'result', fallbackSteps, mode);
-  const done = status !== 'processing';
+  const done = status === 'done';
+  const isError = status === 'error';
+  const isTimeout = status === 'timeout';
+  const isFinished = done || isError || isTimeout;
 
   const [logEntries, setLogEntries] = useState<string[]>([]);
   const [elapsed, setElapsed] = useState(0);
@@ -60,7 +63,7 @@ function LoadingContent() {
   const prevProgressRef = useRef<string>('');
 
   const hasLogs = logEntries.length > 0;
-  const waiting = !hasLogs && !done;
+  const waiting = !hasLogs && !isFinished;
 
   useEffect(() => {
     if (!progress || progress === prevProgressRef.current) return;
@@ -144,20 +147,22 @@ function LoadingContent() {
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full"
                 style={{
-                  backgroundColor: done ? 'rgba(16,185,129,0.1)' : `${accentColor}1A`,
-                  border: `1px solid ${done ? 'rgba(16,185,129,0.3)' : `${accentColor}4D`}`,
+                  backgroundColor: done ? 'rgba(16,185,129,0.1)' : isTimeout ? 'rgba(245,158,11,0.1)' : isError ? 'rgba(239,68,68,0.1)' : `${accentColor}1A`,
+                  border: `1px solid ${done ? 'rgba(16,185,129,0.3)' : isTimeout ? 'rgba(245,158,11,0.3)' : isError ? 'rgba(239,68,68,0.3)' : `${accentColor}4D`}`,
                 }}
               >
-                <span className={`w-1.5 h-1.5 rounded-full ${done ? '' : 'pulse-live'}`}
-                  style={{ backgroundColor: done ? '#10B981' : accentColor }}
+                <span className={`w-1.5 h-1.5 rounded-full ${!isFinished ? 'pulse-live' : ''}`}
+                  style={{ backgroundColor: done ? '#10B981' : isTimeout ? '#F59E0B' : isError ? '#EF4444' : accentColor }}
                 />
-                <span className="data-label" style={{ color: done ? '#10B981' : accentColor }}>
-                  {done ? 'COMPLETE' : 'PROCESSING'}
+                <span className="data-label" style={{ color: done ? '#10B981' : isTimeout ? '#F59E0B' : isError ? '#EF4444' : accentColor }}>
+                  {done ? 'COMPLETE' : isTimeout ? 'TIMEOUT' : isError ? 'ERROR' : 'PROCESSING'}
                 </span>
               </div>
-              <span className="w-1.5 h-3.5"
-                style={{ backgroundColor: 'var(--color-accent-emerald)', animation: 'blink 1s step-end infinite' }}
-              />
+              {!isFinished && (
+                <span className="w-1.5 h-3.5"
+                  style={{ backgroundColor: 'var(--color-accent-emerald)', animation: 'blink 1s step-end infinite' }}
+                />
+              )}
             </div>
           </div>
 
@@ -206,7 +211,7 @@ function LoadingContent() {
               );
             })}
 
-            {hasLogs && !done && (
+            {hasLogs && !isFinished && (
               <motion.span
                 animate={{ opacity: [0, 1, 0] }}
                 transition={{ repeat: Infinity, duration: 1 }}
@@ -229,13 +234,64 @@ function LoadingContent() {
                 </span>
               </motion.div>
             )}
+
+            {isTimeout && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="flex items-start gap-3 mt-4"
+              >
+                <span className="flex-shrink-0 text-[var(--color-accent-amber)]">[ !! ]</span>
+                <div className="flex-1">
+                  <span className="text-[var(--color-accent-amber)] font-semibold">
+                    Analysis timed out.
+                  </span>
+                  <div className="data-label mt-1" style={{ color: 'var(--color-text-tertiary)' }}>
+                    The backend took too long to respond. This may be due to high load or a network issue.
+                  </div>
+                  <button
+                    onClick={() => router.push('/')}
+                    className="mt-3 px-4 py-1.5 rounded-lg text-xs font-semibold text-white transition-colors"
+                    style={{ backgroundColor: accentColor }}
+                  >
+                    Try Again
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            {isError && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="flex items-start gap-3 mt-4"
+              >
+                <span className="flex-shrink-0 text-[var(--color-accent-red)]">[FAIL]</span>
+                <div className="flex-1">
+                  <span className="text-[var(--color-accent-red)] font-semibold">
+                    Analysis failed.
+                  </span>
+                  <div className="data-label mt-1" style={{ color: 'var(--color-text-tertiary)' }}>
+                    The backend encountered an error processing this request.
+                  </div>
+                  <button
+                    onClick={() => router.push('/')}
+                    className="mt-3 px-4 py-1.5 rounded-lg text-xs font-semibold text-white transition-colors"
+                    style={{ backgroundColor: accentColor }}
+                  >
+                    Try Again
+                  </button>
+                </div>
+              </motion.div>
+            )}
           </div>
 
           <div className="relative h-[3px] overflow-hidden" style={{ backgroundColor: 'var(--color-bg-elevated)' }}>
             <motion.div
-              className="h-full progress-gradient"
-              animate={{ width: `${done ? 100 : Math.max(5, pct)}%` }}
+              className={`h-full ${!isFinished || done ? 'progress-gradient' : ''}`}
+              animate={{ width: `${isFinished ? (done ? 100 : pct) : Math.max(5, pct)}%` }}
               transition={{ ease: 'easeOut', duration: 0.3 }}
+              style={isTimeout ? { backgroundColor: '#F59E0B' } : isError ? { backgroundColor: '#EF4444' } : undefined}
             />
           </div>
 

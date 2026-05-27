@@ -159,18 +159,28 @@ def _search_sync(
 async def search_claim(
     claim: str,
     max_results: int = SEARCH_RESULTS_MAX,
+    timeout: float = 45.0,
 ) -> list[dict]:
     try:
-        results = await search_with_fallback(claim, max_results)
+        results = await asyncio.wait_for(
+            search_with_fallback(claim, max_results),
+            timeout=timeout,
+        )
         if results:
             logger.info(f"Routing search returned {len(results)} results")
         else:
-            results = await asyncio.to_thread(_search_sync, claim, max_results)
+            results = await asyncio.wait_for(
+                asyncio.to_thread(_search_sync, claim, max_results),
+                timeout=25.0,
+            )
             if results:
                 logger.info(f"Fallback search returned {len(results)} results")
             else:
                 logger.info("Web search returned no results")
         return results
+    except asyncio.TimeoutError:
+        logger.warning(f"Web search timed out after {timeout}s")
+        return []
     except Exception as e:
         logger.warning(f"Web search failed: {str(e)}")
         return []

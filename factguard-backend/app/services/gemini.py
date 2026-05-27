@@ -26,6 +26,7 @@ from app.utils.constants import (
     VALID_STANCES,
 )
 from app.utils.parsing import (
+    parse_json_response,
     strip_scratchpad,
     validate_source_urls,
 )
@@ -288,21 +289,19 @@ async def analyze_claim(
                 timeout=30.0,
             )
 
-            text = (
-                response.text.replace(
-                    "```json",
-                    "",
+            try:
+                response_text = response.text
+            except ValueError as e:
+                feedback = getattr(response, "prompt_feedback", None)
+                candidates = getattr(response, "candidates", [])
+                logger.warning(
+                    f"Gemini response blocked: {e}, "
+                    f"prompt_feedback={feedback}, "
+                    f"candidates={candidates}"
                 )
-                .replace(
-                    "```",
-                    "",
-                )
-                .strip()
-            )
+                raise json.JSONDecodeError(str(e), "", 0)
 
-            text = strip_scratchpad(text)
-
-            result = json.loads(text)
+            result = parse_json_response(response_text)
 
             original_urls = {r["url"] for r in search_results if r.get("url")}
             if original_urls:
@@ -327,6 +326,12 @@ async def analyze_claim(
             remaining = max_retries - attempt - 1
 
             if remaining > 0:
+                if job_id:
+                    await set_progress(
+                        job_id,
+                        f"AI timed out, retrying ({attempt + 1}/{max_retries})...",
+                    )
+
                 gemini_service.rotate_key()
 
                 await asyncio.sleep(1)
@@ -352,6 +357,12 @@ async def analyze_claim(
             )
 
             if remaining > 0:
+                if job_id:
+                    await set_progress(
+                        job_id,
+                        f"AI rate limited, switching key ({attempt + 1}/{max_retries})...",
+                    )
+
                 gemini_service.rotate_key()
 
                 await asyncio.sleep(1)
@@ -359,11 +370,35 @@ async def analyze_claim(
             continue
 
         except json.JSONDecodeError as e:
-            logger.warning(f"JSON parsing failed: {str(e)}")
+            try:
+                candidates_info = [
+                    {
+                        "finish_reason": str(c.finish_reason),
+                        "safety_ratings": [
+                            {"category": r.category, "probability": r.probability}
+                            for r in (c.safety_ratings or [])
+                        ],
+                    }
+                    for c in (getattr(response, "candidates", []) or [])
+                ]
+                feedback = getattr(response, "prompt_feedback", None)
+                logger.warning(
+                    f"JSON parsing failed: {e}, "
+                    f"candidates={candidates_info}, "
+                    f"prompt_feedback={feedback}"
+                )
+            except Exception:
+                logger.warning(f"JSON parsing failed: {e}")
 
             remaining = max_retries - attempt - 1
 
             if remaining > 0:
+                if job_id:
+                    await set_progress(
+                        job_id,
+                        f"AI response malformed, retrying ({attempt + 1}/{max_retries})...",
+                    )
+
                 gemini_service.rotate_key()
 
                 await asyncio.sleep(1)
@@ -392,14 +427,10 @@ async def analyze_claim(
         raw = await call_groq(
             VERIFY_SYSTEM_PROMPT,
             user_prompt,
-            max_tokens=1200,
+            max_tokens=4096,
         )
 
-        raw = raw.replace("```json", "").replace("```", "").strip()
-
-        raw = strip_scratchpad(raw)
-
-        result = json.loads(raw)
+        result = parse_json_response(raw)
 
         original_urls = {r["url"] for r in search_results if r.get("url")}
         if original_urls:
