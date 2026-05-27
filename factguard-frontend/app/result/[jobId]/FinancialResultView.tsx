@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { Area, AreaChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, ArrowRight, AlertTriangle, CheckCircle2, ExternalLink, Activity } from 'lucide-react';
+import { TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, ArrowRight, AlertTriangle, CheckCircle2, ExternalLink, Activity, Loader2 } from 'lucide-react';
 import type { FinancialResult, FinancialSource } from '@/types';
 
 function formatDate(d: string) {
@@ -15,14 +15,152 @@ function formatPrice(p: number) {
   return `$${p.toFixed(2)}`;
 }
 
+function ChartSection({ graph_data }: { graph_data: FinancialResult['graph_data'] }) {
+  const prices = graph_data?.data ?? [];
+  const avg = prices.length ? prices.reduce((s, d) => s + d.price, 0) / prices.length : 0;
+  const positive = graph_data?.change_24h?.startsWith('+') ?? true;
+  const color = positive ? '#10B981' : '#EF4444';
+
+  return (
+    <div className="h-[280px] w-full min-w-0">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={prices} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+          <defs>
+            <linearGradient id="priceGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={color} stopOpacity={0.3} />
+              <stop offset="100%" stopColor={color} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="rgba(99, 102, 241, 0.08)" vertical={false} />
+          <XAxis dataKey="date" tickFormatter={formatDate} stroke="#3D4F6B" style={{ fontFamily: 'DM Mono', fontSize: 10 }} tickLine={false} axisLine={false} />
+          <YAxis domain={['dataMin - 500', 'dataMax + 500']} tickFormatter={(v: number) => formatPrice(v)} stroke="#3D4F6B" style={{ fontFamily: 'DM Mono', fontSize: 10 }} tickLine={false} axisLine={false} orientation="right" />
+          <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 30, 53, 0.95)', border: '1px solid rgba(99, 102, 241, 0.3)', borderRadius: 8, fontFamily: 'DM Mono', fontSize: 12 }} labelStyle={{ color: '#7E8FAD', marginBottom: 4 }} formatter={(value) => [`$${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2 })}`, 'Price']} />
+          <ReferenceLine y={avg} stroke="#7E8FAD" strokeDasharray="4 4" label={{ value: 'AVG', position: 'left', style: { fontFamily: 'DM Mono', fontSize: 9, fill: '#7E8FAD' } }} />
+          <Area type="monotone" dataKey="price" stroke={color} strokeWidth={2} fill="url(#priceGradient)" animationDuration={1500} />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
 export function FinancialResultView({ data }: { data: FinancialResult }) {
   const { graph_data, analysis } = data;
+
+  if (!analysis) {
+    return (
+      <div className="p-6 max-w-7xl mx-auto">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
+          <div className="data-label mb-2">MARKET SIGNAL REPORT</div>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold" style={{ color: 'var(--color-text-primary)', fontFamily: 'var(--font-sora)' }}>Financial Analysis</h1>
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
+              style={{
+                backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                border: '1px solid rgba(245, 158, 11, 0.3)',
+                color: '#F59E0B',
+              }}
+            >
+              <Loader2 className="w-3 h-3 animate-spin" />
+              ENRICHING
+            </div>
+          </div>
+        </motion.div>
+
+        <div className="grid lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-6">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="rounded-2xl p-6"
+              style={{ backgroundColor: 'var(--color-bg-surface)', border: '1px solid var(--color-border-default)' }}
+            >
+              <div className="flex items-start justify-between mb-6 flex-wrap gap-4">
+                <div>
+                  <div className="data-label mb-1">{graph_data?.label ?? 'Unknown'}</div>
+                  <div className="text-2xl font-bold" style={{ color: 'var(--color-text-primary)', fontFamily: 'var(--font-sora)' }}>
+                    {graph_data?.label}
+                  </div>
+                  <div className="flex items-baseline gap-3 mt-1">
+                    <div className="font-mono text-4xl font-black" style={{ color: 'var(--color-text-primary)' }}>
+                      ${graph_data?.current_price?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '0.00'}
+                    </div>
+                    {graph_data?.change_24h && (
+                      <div className={`flex items-center gap-1 px-2 py-1 rounded text-sm font-semibold ${
+                        (graph_data.change_24h.startsWith('+') ?? true)
+                          ? 'bg-emerald-500/10 text-[var(--color-accent-emerald)]'
+                          : 'bg-red-500/10 text-[var(--color-accent-red)]'
+                      }`}>
+                        {(graph_data.change_24h.startsWith('+') ?? true) ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                        {graph_data.change_24h}
+                      </div>
+                    )}
+                  </div>
+                  <div className="data-label mt-1 flex items-center gap-3">
+                    {graph_data?.change_7d && <span>7d: <span className={graph_data.change_7d.startsWith('+') ? 'text-[var(--color-accent-emerald)]' : 'text-[var(--color-accent-red)]'}>{graph_data.change_7d}</span></span>}
+                    {graph_data?.all_time_high && <span>ATH: <span className="font-mono">${graph_data.all_time_high.toLocaleString()}</span></span>}
+                  </div>
+                </div>
+              </div>
+              <ChartSection graph_data={graph_data} />
+            </motion.div>
+          </div>
+
+          <div className="space-y-6">
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="rounded-2xl p-6 text-center"
+              style={{ backgroundColor: 'var(--color-bg-surface)', border: '1px solid var(--color-border-default)' }}
+            >
+              <Loader2 className="w-10 h-10 mx-auto mb-3 animate-spin" style={{ color: '#F59E0B' }} />
+              <div className="text-sm font-semibold" style={{ color: '#F59E0B' }}>
+                AI is analysing market
+              </div>
+              <div className="text-xs mt-1" style={{ color: 'var(--color-text-tertiary)' }}>
+                wait for verdict
+              </div>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.2 }}
+              className="rounded-2xl p-5"
+              style={{ backgroundColor: 'var(--color-bg-surface)', border: '1px solid var(--color-border-default)' }}
+            >
+              <div className="data-label mb-3">SOURCES ({data.sources?.length ?? 0})</div>
+              <div className="space-y-2">
+                {data.sources?.map((source: FinancialSource, i: number) => (
+                  <a
+                    key={i}
+                    href={source.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 py-1.5 transition-colors group"
+                    style={{ color: 'var(--color-text-primary)' }}
+                  >
+                    <div className="w-5 h-5 rounded flex items-center justify-center text-[9px] font-mono shrink-0"
+                      style={{ backgroundColor: 'var(--color-bg-elevated)', color: 'var(--color-text-tertiary)' }}
+                    >S</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs truncate transition-colors group-hover:text-[var(--color-accent-primary)]" style={{ color: 'var(--color-text-primary)' }}>
+                        {source.title}
+                      </div>
+                      {source.date && <div className="data-label font-mono mt-0.5">{source.date}</div>}
+                    </div>
+                    <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: 'var(--color-text-tertiary)' }} />
+                  </a>
+                ))}
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const isPositive = graph_data?.change_24h?.startsWith('+') ?? true;
   const lineColor = isPositive ? '#10B981' : '#EF4444';
-
-  const avgPrice = graph_data?.data?.length
-    ? graph_data.data.reduce((sum, d) => sum + d.price, 0) / graph_data.data.length
-    : 0;
 
   const signalColor = analysis.signal === 'Bullish' ? '#10B981' : analysis.signal === 'Bearish' ? '#EF4444' : '#F59E0B';
   const SignalIcon = analysis.signal === 'Bullish' ? TrendingUp : analysis.signal === 'Bearish' ? TrendingDown : ArrowRight;
@@ -39,7 +177,6 @@ export function FinancialResultView({ data }: { data: FinancialResult }) {
       </motion.div>
 
       <div className="grid lg:grid-cols-5 gap-6">
-        {/* Chart area - 3 cols */}
         <div className="lg:col-span-3 space-y-6">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -83,25 +220,7 @@ export function FinancialResultView({ data }: { data: FinancialResult }) {
                 </div>
               )}
             </div>
-
-            <div className="h-[280px] w-full min-w-0">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={graph_data?.data ?? []} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="priceGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={lineColor} stopOpacity={0.3} />
-                      <stop offset="100%" stopColor={lineColor} stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(99, 102, 241, 0.08)" vertical={false} />
-                  <XAxis dataKey="date" tickFormatter={formatDate} stroke="#3D4F6B" style={{ fontFamily: 'DM Mono', fontSize: 10 }} tickLine={false} axisLine={false} />
-                  <YAxis domain={['dataMin - 500', 'dataMax + 500']} tickFormatter={(v: number) => formatPrice(v)} stroke="#3D4F6B" style={{ fontFamily: 'DM Mono', fontSize: 10 }} tickLine={false} axisLine={false} orientation="right" />
-                  <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 30, 53, 0.95)', border: '1px solid rgba(99, 102, 241, 0.3)', borderRadius: 8, fontFamily: 'DM Mono', fontSize: 12 }} labelStyle={{ color: '#7E8FAD', marginBottom: 4 }} formatter={(value) => [`$${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2 })}`, 'Price']} />
-                  <ReferenceLine y={avgPrice} stroke="#7E8FAD" strokeDasharray="4 4" label={{ value: 'AVG', position: 'left', style: { fontFamily: 'DM Mono', fontSize: 9, fill: '#7E8FAD' } }} />
-                  <Area type="monotone" dataKey="price" stroke={lineColor} strokeWidth={2} fill="url(#priceGradient)" animationDuration={1500} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+            <ChartSection graph_data={graph_data} />
           </motion.div>
 
           <motion.div
@@ -116,7 +235,6 @@ export function FinancialResultView({ data }: { data: FinancialResult }) {
           </motion.div>
         </div>
 
-        {/* Signal panel - 2 cols */}
         <div className="lg:col-span-2 space-y-6">
           <motion.div
             initial={{ opacity: 0, x: 20 }}

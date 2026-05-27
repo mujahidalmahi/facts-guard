@@ -103,51 +103,68 @@ export default function ResultPage({ params }: { params: Promise<{ jobId: string
   const [showAllSources, setShowAllSources] = useState(false);
   const mountedRef = useRef(true);
 
-  const sortedSources = useMemo(() => {
-    const srcs = data?.sources ?? [];
-    const copy = [...srcs];
-    copy.sort((a: Source, b: Source) => {
-      if (sortKey === 'credibility') {
-        const order = { High: 3, Medium: 2, Low: 1 };
-        return order[b.credibility] - order[a.credibility];
-      }
-      return b.relevance - a.relevance;
-    });
-    return copy;
-  }, [data?.sources, sortKey]);
-
   useEffect(() => {
-    mountedRef.current = true;
-    let attempts = 0;
-    const MAX = 40;
-    const INTERVAL = 1500;
+    const startedAt = Date.now();
+    const MAX_POLL_MS = 120_000;
+    const INITIAL_INTERVAL = 1000;
+    const MAX_INTERVAL = 5000;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let abortController: AbortController | undefined;
+    let currentInterval = INITIAL_INTERVAL;
+
+    mountedRef.current = true;
 
     async function poll() {
       if (!mountedRef.current) return;
-      attempts++;
-      if (attempts > MAX) { mountedRef.current && setError(true); return; }
+
+      if (Date.now() - startedAt > MAX_POLL_MS) {
+        mountedRef.current && setError(true);
+        return;
+      }
+
+      abortController?.abort();
+      abortController = new AbortController();
+
       try {
-        const res = await fetch(`${API_URL}${endpoint}/${jobId}?mode=${mode}`);
+        const res = await fetch(`${API_URL}${endpoint}/${jobId}`, {
+          signal: abortController.signal,
+        });
         if (!mountedRef.current) return;
         if (!res.ok) throw new Error(String(res.status));
         const result = await res.json();
         if (!mountedRef.current) return;
+
         if (result.status === 'processing') {
-          timer = setTimeout(poll, INTERVAL);
+          currentInterval = Math.min(currentInterval * 1.5, MAX_INTERVAL);
+          timer = setTimeout(poll, currentInterval);
           return;
         }
-        if (result.status === 'error') { mountedRef.current && setError(true); return; }
+
+        if (result.status === 'error') {
+          mountedRef.current && setError(true);
+          return;
+        }
+
         mountedRef.current && setData(result);
       } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
         console.error(err);
-        mountedRef.current && setError(true);
+        if (!mountedRef.current) return;
+        currentInterval = Math.min(currentInterval * 1.5, MAX_INTERVAL);
+        timer = setTimeout(poll, currentInterval);
       }
     }
-    poll();
-    return () => { mountedRef.current = false; if (timer) clearTimeout(timer); };
+
+    timer = setTimeout(poll, INITIAL_INTERVAL);
+
+    return () => {
+      mountedRef.current = false;
+      abortController?.abort();
+      if (timer) clearTimeout(timer);
+    };
   }, [jobId, endpoint, mode]);
 
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const sortedSources = useMemo(() => {
     if (!data?.sources) return [];
     const copy = [...data.sources];
@@ -449,7 +466,20 @@ export default function ResultPage({ params }: { params: Promise<{ jobId: string
                                     </span>
                                   )}
                                 </div>
-                                <div className="data-label mt-0.5">{(() => { try { return source.url ? new URL(source.url).hostname : '' } catch { return '' } })()}</div>
+                                <div className="data-label mt-0.5">
+                                  {(() => { try { return source.url ? new URL(source.url).hostname : '' } catch { return '' } })()}
+                                  {source.url && (
+                                    <a
+                                      href={source.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="ml-1.5 inline-flex items-center gap-0.5 hover:text-[var(--color-accent-primary)] transition-colors align-middle"
+                                    >
+                                      <ExternalLink className="w-2.5 h-2.5" />
+                                    </a>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </td>

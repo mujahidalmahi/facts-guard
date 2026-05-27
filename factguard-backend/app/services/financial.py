@@ -1,6 +1,8 @@
 import yfinance as yf
+from asyncio import Semaphore
 from app.services.supabase_db import (
     save_financial_result,
+    update_financial_result,
     get_saved_financial_result,
 )
 from datetime import (
@@ -16,6 +18,8 @@ from app.services.cache import (
     set_job_query,
     set_progress,
     push_claim_to_history,
+    get_cached_serp,
+    set_cached_serp,
 )
 
 from app.services.deepseek import (
@@ -37,6 +41,8 @@ from app.services.brightdata import (
 from app.utils.duckduckgo import search as ddg_search
 
 logger = get_logger("financial")
+
+_browser_sem = Semaphore(2)
 
 
 async def create_financial_query(
@@ -106,6 +112,44 @@ def _try_yfinance_chart(query: str) -> dict | None:
     return None
 
 
+async def _run_serp_search(query: str) -> list[dict]:
+    """Run SERP search across Google, Bing, and DuckDuckGo with Redis caching."""
+    cached = await get_cached_serp(query)
+    if cached is not None:
+        logger.info(f"SERP cache hit for: {query[:60]}")
+        return cached
+
+    google_task = serp_search(query, max_results=5)
+    bing_task = serp_search(query, max_results=5, engine="bing")
+    ddg_task = asyncio.to_thread(ddg_search, query, 5)
+
+    google_results, bing_results, ddg_results = await asyncio.gather(
+        google_task, bing_task, ddg_task, return_exceptions=True
+    )
+
+    all_results = []
+    seen_urls = set()
+    for results in [google_results, bing_results, ddg_results]:
+        if isinstance(results, list) and results:
+            for r in results:
+                url = r.get("url", "")
+                if url and url not in seen_urls:
+                    seen_urls.add(url)
+                    all_results.append(r)
+
+    logger.info(
+        f"Found {len(all_results)} unique results "
+        f"(Google: {len(google_results) if isinstance(google_results, list) else 0}, "
+        f"Bing: {len(bing_results) if isinstance(bing_results, list) else 0}, "
+        f"DDG: {len(ddg_results) if isinstance(ddg_results, list) else 0})"
+    )
+
+    if all_results:
+        await set_cached_serp(query, all_results)
+
+    return all_results
+
+
 async def process_financial_analysis(
     query_id: str,
     query: str,
@@ -114,103 +158,37 @@ async def process_financial_analysis(
     logger.info(f"Financial analysis started: {query}")
 
     try:
-        await set_progress(
-            job_id,
-            "Searching Google, Bing & DuckDuckGo...",
-        )
+        await set_progress(job_id, "Searching Google, Bing & DuckDuckGo...")
 
-        google_task = serp_search(query, max_results=5)
-        bing_task = serp_search(query, max_results=5, engine="bing")
-        ddg_task = asyncio.to_thread(ddg_search, query, 5)
+        # Start both SERP and WSS tasks in parallel
+        serp_task = asyncio.create_task(_run_serp_search(query))
+        wss_task = asyncio.create_task(_enrich_with_wss(job_id, query, serp_task))
 
-        google_results, bing_results, ddg_results = await asyncio.gather(
-            google_task, bing_task, ddg_task, return_exceptions=True
-        )
-
-        all_results = []
-        seen_urls = set()
-        for results in [google_results, bing_results, ddg_results]:
-            if isinstance(results, list) and results:
-                for r in results:
-                    url = r.get("url", "")
-                    if url and url not in seen_urls:
-                        seen_urls.add(url)
-                        all_results.append(r)
-
-        logger.info(
-            f"Found {len(all_results)} unique results "
-            f"(Google: {len(google_results) if isinstance(google_results, list) else 0}, "
-            f"Bing: {len(bing_results) if isinstance(bing_results, list) else 0}, "
-            f"DDG: {len(ddg_results) if isinstance(ddg_results, list) else 0})"
-        )
-
-        search_context = ""
-        if all_results:
-            lines = []
-            for i, r in enumerate(all_results[:8], 1):
-                lines.append(f'{i}. "{r["title"]}"')
-                lines.append(f'   URL: {r["url"]}')
-                lines.append(f'   Source: {r.get("source", "web")}')
-                lines.append(f'   Snippet: {r.get("snippet", "")}')
-            search_context = "\n".join(lines)
-
-        browser_texts: dict[str, str] = {}
-        if all_results:
-            await set_progress(
-                job_id,
-                "Extracting articles via browser...",
-            )
-            top_urls = [r["url"] for r in all_results[:5] if r.get("url")]
-            if top_urls:
-                extracted_list = await asyncio.gather(
-                    *[browser_extract_text(url) for url in top_urls],
-                    return_exceptions=True,
-                )
-                for url, extracted in zip(top_urls, extracted_list):
-                    if isinstance(extracted, str) and extracted:
-                        browser_texts[url] = extracted
-                        search_context += (
-                            "\n\nFULL ARTICLE TEXT " f"(from {url}):\n" f"{extracted[:3000]}"
-                        )
-
-        await set_progress(
-            job_id,
-            "Running AI analysis...",
-        )
-
-        ai_analysis = await deepseek_financial_analysis(
-            query,
-            search_context,
-        )
-
+        # Phase 1: await SERP results — fast (~5s)
+        all_results = await serp_task
         graph_data = _try_yfinance_chart(query)
 
         sources = []
         if all_results:
             for r in all_results[:5]:
                 url = r.get("url", "")
-                source = {
+                sources.append({
                     "title": r.get("title", ""),
                     "url": url,
                     "credibility": "Medium",
-                    "stance": ai_analysis.get("price_trend", "Neutral"),
+                    "stance": "Neutral",
                     "summary": (r.get("snippet", "") or "")[:200],
                     "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-                }
-                if url in browser_texts:
-                    source["extraction"] = "browser"
-                sources.append(source)
+                })
         else:
-            sources.append(
-                {
-                    "title": "Web Search",
-                    "url": "https://duckduckgo.com",
-                    "credibility": "Medium",
-                    "stance": ai_analysis.get("price_trend", "Neutral"),
-                    "summary": "Analysis based on available data.",
-                    "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-                }
-            )
+            sources.append({
+                "title": "Web Search",
+                "url": "https://duckduckgo.com",
+                "credibility": "Medium",
+                "stance": "Neutral",
+                "summary": "No results found.",
+                "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            })
 
         result = {
             "mode": "financial",
@@ -218,22 +196,22 @@ async def process_financial_analysis(
             "jobId": job_id,
             "query": query,
             "graph_data": graph_data,
-            "analysis": ai_analysis,
             "sources": sources,
+            "enriching": True,
         }
-
         await save_financial_result(job_id, query, result)
 
-        await push_claim_to_history(
-            {
-                "jobId": job_id,
-                "claim": f"[FINANCIAL] {query}",
-                "status": STATUS_DONE,
-                "createdAt": datetime.now(timezone.utc).isoformat(),
-            }
-        )
+        await push_claim_to_history({
+            "jobId": job_id,
+            "claim": f"[FINANCIAL] {query}",
+            "status": STATUS_DONE,
+            "createdAt": datetime.now(timezone.utc).isoformat(),
+        })
 
-        logger.info(f"Financial analysis completed: {job_id}")
+        logger.info(f"Phase 1 complete (initial result saved): {job_id}")
+
+        # Phase 2: await WSS enrichment — slow (~50s)
+        await wss_task
 
     except Exception as e:
         logger.error(f"Financial analysis failed: {e}")
@@ -255,6 +233,94 @@ async def process_financial_analysis(
             },
         }
         await save_financial_result(job_id, query, error_result)
+
+
+async def _enrich_with_wss(
+    job_id: str,
+    query: str,
+    serp_task: asyncio.Task,
+):
+    """Phase 2: awaits SERP results, extracts articles via WSS, runs AI, updates result."""
+    try:
+        # Wait for SERP to provide URLs
+        all_results = await serp_task
+
+        await set_progress(job_id, "Extracting articles via browser...")
+
+        top_urls = [r["url"] for r in all_results[:5] if r.get("url")]
+        browser_texts: dict[str, str] = {}
+        if top_urls:
+            async def _extract_one(url: str) -> tuple[str, str | None]:
+                async with _browser_sem:
+                    text = await browser_extract_text(url)
+                    return url, text
+            extracted_list = await asyncio.gather(
+                *[_extract_one(url) for url in top_urls],
+                return_exceptions=True,
+            )
+            for item in extracted_list:
+                if isinstance(item, tuple):
+                    url, extracted = item
+                    if isinstance(extracted, str) and extracted:
+                        browser_texts[url] = extracted
+
+        search_context_lines = []
+        if all_results:
+            for i, r in enumerate(all_results[:8], 1):
+                search_context_lines.append(f'{i}. "{r["title"]}"')
+                search_context_lines.append(f'   URL: {r["url"]}')
+                search_context_lines.append(f'   Source: {r.get("source", "web")}')
+                search_context_lines.append(f'   Snippet: {r.get("snippet", "")}')
+            search_context = "\n".join(search_context_lines)
+            for url in top_urls:
+                if url in browser_texts:
+                    search_context += f"\n\nFULL ARTICLE TEXT (from {url}):\n{browser_texts[url][:3000]}"
+
+        enriched_analysis = await deepseek_financial_analysis(query, search_context)
+
+        sources = []
+        for r in all_results[:5]:
+            url = r.get("url", "")
+            source = {
+                "title": r.get("title", ""),
+                "url": url,
+                "credibility": "Medium",
+                "stance": enriched_analysis.get("price_trend", "Neutral"),
+                "summary": (r.get("snippet", "") or "")[:200],
+                "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            }
+            if url in browser_texts:
+                source["extraction"] = "browser"
+            sources.append(source)
+
+        enriched_result = {
+            "mode": "financial",
+            "status": STATUS_DONE,
+            "jobId": job_id,
+            "query": query,
+            "graph_data": _try_yfinance_chart(query),
+            "analysis": enriched_analysis,
+            "sources": sources,
+            "enriching": False,
+        }
+
+        await update_financial_result(job_id, enriched_result)
+        logger.info(f"Enrichment complete: {job_id}")
+
+    except Exception as e:
+        logger.error(f"WSS enrichment failed: {e}")
+        try:
+            saved = await get_saved_financial_result(job_id)
+            if saved:
+                r = saved.get("result")
+                if isinstance(r, str):
+                    import json
+                    r = json.loads(r)
+                if isinstance(r, dict):
+                    r["enriching"] = False
+                    await update_financial_result(job_id, r)
+        except Exception as e2:
+            logger.error(f"Failed to clear enriching flag: {e2}")
 
 
 async def get_full_financial_result(

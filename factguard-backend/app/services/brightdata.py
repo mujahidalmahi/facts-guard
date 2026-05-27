@@ -210,18 +210,27 @@ async def unlocker_scrape(url: str) -> Optional[str]:
 
 
 async def scrape_page_full(url: str) -> Optional[str]:
-    """Fetch full HTML of a page via Web Unlocker (no truncation)."""
-    api_key = _get_api_key()
-    if not api_key:
+    """Fetch full HTML of a page via Scraping Browser CDP (no truncation)."""
+    wss_url = settings.BRIGHTDATA_WSS
+    if not wss_url:
+        logger.warning("BRIGHTDATA_WSS not configured")
         return None
     try:
-        payload = {"zone": "unlocker", "url": url, "format": "raw"}
-        async with httpx.AsyncClient(timeout=15) as client:
-            resp = await client.post(
-                BRIGHTDATA_ENDPOINT, json=payload, headers=_headers()
+        from playwright.async_api import async_playwright
+
+        async with async_playwright() as p:
+            logger.info(f"Connecting to BrightData CDP for: {url}")
+            browser = await p.chromium.connect_over_cdp(
+                wss_url, timeout=settings.BROWSER_TIMEOUT * 1000 + 5000
             )
-            resp.raise_for_status()
-            html = resp.text
+            page = await browser.new_page()
+            await page.goto(
+                url, wait_until="domcontentloaded", timeout=settings.BROWSER_TIMEOUT * 1000
+            )
+            html = await page.evaluate("() => document.documentElement.outerHTML")
+            await page.close()
+            await browser.close()
+
         logger.info(f"scrape_page_full: {url} ({len(html)} chars)")
         return html
     except Exception as e:

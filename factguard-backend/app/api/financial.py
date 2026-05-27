@@ -20,6 +20,7 @@ from app.schemas import (
 from app.services.cache import (
     get_progress,
 )
+from app.services.dedup import dedup
 
 from app.services.financial import (
     create_financial_query,
@@ -64,20 +65,25 @@ async def financial(
 async def get_financial_result(
     job_id: str,
 ):
-    data = await get_full_financial_result(job_id)
+    async def _fetch():
+        data = await get_full_financial_result(job_id)
+        if not data:
+            return None
+        if data.get("status") == STATUS_PROCESSING:
+            progress = await get_progress(job_id)
+            return {"_progress": progress or "Fetching market data..."}
+        return data
 
-    if not data:
+    data = await dedup(f"financial:{job_id}", _fetch)
+
+    if data is None:
         raise ClaimNotFoundError(job_id)
 
-    status = data.get("status")
-
-    if status == STATUS_PROCESSING:
-        progress = await get_progress(job_id)
-
+    if progress := data.get("_progress"):
         return {
             "status": "processing",
             "jobId": job_id,
-            "progress": progress or "Fetching market data...",
+            "progress": progress,
         }
 
     return data

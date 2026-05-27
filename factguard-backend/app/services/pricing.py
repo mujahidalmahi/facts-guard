@@ -395,7 +395,7 @@ async def fetch_product_prices(
     search_query = f"{product_name} " f"price buy online"
 
     marketplace_task = asyncio.wait_for(
-        search_all_marketplaces(product_name), timeout=40
+        search_all_marketplaces(product_name), timeout=130
     )
     serp_task = asyncio.wait_for(
         search_claim(search_query, max_results=10), timeout=40

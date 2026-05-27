@@ -93,8 +93,9 @@ const MODE_CONFIG: Record<
 
 export default function HomePage() {
   const searchParams = useSearchParams();
-  const modeParam = searchParams.get('mode') as AppMode | null;
-  const mode: AppMode = modeParam || 'verify';
+  const rawMode = searchParams.get('mode');
+  const VALID_MODES: AppMode[] = ['verify', 'financial', 'security', 'cart'];
+  const mode: AppMode = VALID_MODES.includes(rawMode as AppMode) ? (rawMode as AppMode) : 'verify';
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -102,6 +103,7 @@ export default function HomePage() {
   const [query, setQuery] = useState('');
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setShowSplash(!sessionStorage.getItem('splashShown'));
   }, []);
 

@@ -17,6 +17,7 @@ from app.schemas import (
 from app.services.cache import (
     get_progress,
 )
+from app.services.dedup import dedup
 
 from app.services.pricing import (
     create_query,
@@ -74,20 +75,25 @@ async def price_check(
 async def get_price_result(
     job_id: str,
 ):
-    data = await get_full_price_result(job_id)
+    async def _fetch():
+        data = await get_full_price_result(job_id)
+        if not data:
+            return None
+        if data.get("status") == STATUS_PROCESSING:
+            progress = await get_progress(job_id)
+            return {"_progress": progress or PRICING_PROGRESS_SEARCHING}
+        return data
 
-    if not data:
+    data = await dedup(f"price:{job_id}", _fetch)
+
+    if data is None:
         raise ClaimNotFoundError(job_id)
 
-    status = data.get("status")
-
-    if status == STATUS_PROCESSING:
-        progress = await get_progress(job_id)
-
+    if progress := data.get("_progress"):
         return {
             "status": "processing",
             "jobId": job_id,
-            "progress": progress or PRICING_PROGRESS_SEARCHING,
+            "progress": progress,
         }
 
     return data

@@ -41,6 +41,7 @@ export function useJobPolling(jobId: string, resultPath: string, progressSteps: 
     mountedRef.current = true
     startedRef.current = Date.now()
     intervalRef.current = INITIAL_INTERVAL
+    let abortController: AbortController | undefined
 
     async function poll() {
       if (!mountedRef.current) return
@@ -50,10 +51,15 @@ export function useJobPolling(jobId: string, resultPath: string, progressSteps: 
         return
       }
 
+      abortController?.abort()
+      abortController = new AbortController()
+
       try {
-        const res = await fetch(`${API_URL}${pollPath}/${jobId}?mode=${mode}`)
+        const res = await fetch(`${API_URL}${pollPath}/${jobId}?mode=${mode}`, {
+          signal: abortController.signal,
+        })
         if (!mountedRef.current) return
-        if (!res.ok) return
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
 
         const data = await res.json()
         if (!mountedRef.current) return
@@ -66,8 +72,8 @@ export function useJobPolling(jobId: string, resultPath: string, progressSteps: 
           setStatus(data.status)
           return
         }
-      } catch {
-        // retry on next interval
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return
       }
 
       intervalRef.current = Math.min(intervalRef.current * 1.5, MAX_INTERVAL)
@@ -78,6 +84,7 @@ export function useJobPolling(jobId: string, resultPath: string, progressSteps: 
 
     return () => {
       mountedRef.current = false
+      abortController?.abort()
       if (timerRef.current) {
         clearTimeout(timerRef.current)
       }

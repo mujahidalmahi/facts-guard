@@ -152,8 +152,7 @@ function ListingCard({ listing, index, isBest }: { listing: CartListingEntry; in
 }
 
 export function CartResultView({ data }: { data: CartResult }) {
-  const a = data.analysis;
-  const listings = a.listings ?? data.listings ?? [];
+  const listings = data.analysis?.listings ?? data.listings ?? [];
 
   const sorted = useMemo(() => {
     const order = { GREEN: 0, YELLOW: 1, RED: 2 };
@@ -212,7 +211,7 @@ export function CartResultView({ data }: { data: CartResult }) {
           CARTGUARD ANALYSIS · {listings.length} LISTINGS SCANNED
         </div>
         <h1 className="text-3xl font-bold mb-4" style={{ color: 'var(--color-text-primary)', fontFamily: 'var(--font-sora)' }}>
-          {a.product_name || data.product}
+          {data.analysis?.product_name || data.product}
         </h1>
 
         <div

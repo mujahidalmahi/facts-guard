@@ -35,6 +35,7 @@ from app.services.cache import (
     set_job_result,
     set_progress,
 )
+from app.services.dedup import dedup
 
 from app.services.gemini import (
     analyze_claim,
@@ -189,33 +190,42 @@ async def get_result(
     job_id: str,
     response: Response,
 ):
-    result = await get_job_result(job_id)
+    async def _fetch():
+        result = await get_job_result(job_id)
 
-    if not result:
-        db_row = await get_result_by_job_id(job_id)
+        if not result:
+            db_row = await get_result_by_job_id(job_id)
+            if db_row:
+                result = db_row.get("raw_json")
 
-        if db_row:
-            result = db_row.get("raw_json")
+        if result:
+            return result
 
-    if result:
-        response.headers["Cache-Control"] = "public, max-age=3600, stale-while-revalidate=86400"
-        return {
-            **result,
-            "status": "done",
-            "jobId": job_id,
-        }
+        claim = await get_claim_by_job_id(job_id)
+        if claim and claim.get("status") == "error":
+            return {"_error": True}
 
-    claim = await get_claim_by_job_id(job_id)
+        progress = await get_progress(job_id)
+        return {"_progress": progress or "Initialising..."}
 
-    if claim and claim.get("status") == "error":
+    data = await dedup(f"verify:{job_id}", _fetch)
+
+    if data.get("_error"):
         return {
             "status": "error",
             "jobId": job_id,
         }
 
-    progress = await get_progress(job_id)
+    if progress := data.get("_progress"):
+        return {
+            "status": "processing",
+            "jobId": job_id,
+            "progress": progress,
+        }
+
+    response.headers["Cache-Control"] = "public, max-age=3600, stale-while-revalidate=86400"
     return {
-        "status": "processing",
+        **data,
+        "status": "done",
         "jobId": job_id,
-        "progress": progress or "Initialising...",
     }

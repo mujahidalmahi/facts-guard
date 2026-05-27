@@ -245,6 +245,40 @@ def _validate_response(
     return True
 
 
+def _search_results_to_sources(search_results: list[dict]) -> list[dict]:
+    """Convert raw search results to the source format used in responses."""
+    sources = []
+    seen = set()
+    for r in search_results:
+        url = r.get("url", "")
+        if not url or url in seen:
+            continue
+        seen.add(url)
+        sources.append({
+            "title": r.get("title", ""),
+            "url": url,
+            "author": None,
+            "date": None,
+            "stance": "neutral",
+            "credibility": "Medium",
+            "relevance": max(0, 10 - len(sources)),
+            "summary": (r.get("snippet", "") or "")[:200],
+        })
+    return sources
+
+
+def _fallback_with_sources(
+    search_results: list[dict],
+    summary: str = "Could not analyze claim. Please try again.",
+) -> dict:
+    sources = _search_results_to_sources(search_results)
+    return {
+        **FALLBACK_RESPONSE,
+        "summary": summary,
+        "sources": sources,
+    }
+
+
 async def analyze_claim(
     claim: str,
     job_id: str | None = None,
@@ -314,7 +348,7 @@ async def analyze_claim(
                 )
 
             if not _validate_response(result):
-                return dict(FALLBACK_RESPONSE)
+                return _fallback_with_sources(search_results)
 
             logger.info("Claim analysis completed successfully")
 
@@ -338,10 +372,10 @@ async def analyze_claim(
 
                 continue
 
-            return {
-                **FALLBACK_RESPONSE,
-                "summary": "AI analysis timed out.",
-            }
+            return _fallback_with_sources(
+                search_results,
+                summary="AI analysis timed out.",
+            )
 
         except (
             ResourceExhausted,
@@ -408,7 +442,7 @@ async def analyze_claim(
         except Exception as e:
             logger.error(f"Unexpected error during analysis: {str(e)}")
 
-            return dict(FALLBACK_RESPONSE)
+            return _fallback_with_sources(search_results)
 
     logger.error("All Gemini API key retries exhausted")
 
@@ -440,7 +474,7 @@ async def analyze_claim(
             )
 
         if not _validate_response(result):
-            return dict(FALLBACK_RESPONSE)
+            return _fallback_with_sources(search_results)
 
         result["_provider"] = "groq"
         logger.info("Claim analysis completed via Groq fallback")
@@ -449,7 +483,7 @@ async def analyze_claim(
     except Exception as groq_err:
         logger.error(f"Groq fallback also failed: {groq_err}")
 
-    return {
-        **FALLBACK_RESPONSE,
-        "summary": "All AI providers exhausted. Please try again later.",
-    }
+    return _fallback_with_sources(
+        search_results,
+        summary="All AI providers exhausted. Please try again later.",
+    )

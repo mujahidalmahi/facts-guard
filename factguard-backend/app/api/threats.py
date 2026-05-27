@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 from app.exceptions import ClaimNotFoundError
 from app.logging_config import get_logger
 from app.services.cache import get_job_result, get_progress, set_job_result, set_progress, push_claim_to_history
+from app.services.dedup import dedup
 from app.services.threat_monitor import scan_for_threats, generate_compliance_report
 from app.utils.constants import STATUS_PROCESSING
 
@@ -67,19 +68,26 @@ async def scan_threats(payload: ThreatScanRequest, background_tasks: BackgroundT
 @router.get("/result/{job_id}")
 async def get_threat_result(job_id: str):
     """Poll for threat scan result."""
-    data = await get_job_result(job_id)
+    async def _fetch():
+        data = await get_job_result(job_id)
+        if not data:
+            return None
+        status = data.get("status")
+        if status == STATUS_PROCESSING or not status or status == "processing":
+            progress = await get_progress(job_id)
+            return {"_progress": progress or "Scanning for threats..."}
+        return data
 
-    if not data:
+    data = await dedup(f"threat:{job_id}", _fetch)
+
+    if data is None:
         raise ClaimNotFoundError(job_id)
 
-    status = data.get("status")
-
-    if status == STATUS_PROCESSING or not status or status == "processing":
-        progress = await get_progress(job_id)
+    if progress := data.get("_progress"):
         return {
             "status": "processing",
             "jobId": job_id,
-            "progress": progress or "Scanning for threats...",
+            "progress": progress,
         }
 
     return data

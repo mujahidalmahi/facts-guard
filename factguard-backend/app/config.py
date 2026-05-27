@@ -45,7 +45,7 @@ class Settings(BaseSettings):
 
     BRIGHTDATA_WSS: str = ""
 
-    BROWSER_TIMEOUT: int = 15
+    BROWSER_TIMEOUT: int = 45
 
     MAX_BROWSER_PAGES: int = 1
 

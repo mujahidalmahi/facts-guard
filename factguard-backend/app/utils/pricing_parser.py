@@ -216,5 +216,5 @@ def cluster_listings(listings: list[dict]) -> list[dict]:
         del data["prices"]
         result.append(data)
 
-    result.sort(key=lambda v: v.get("min_price", float("inf")))
+    result.sort(key=lambda v: v["min_price"] if v["min_price"] is not None else float("inf"))
     return result

@@ -128,6 +128,33 @@ async def get_job_query(job_id: str) -> str | None:
         return None
 
 
+SERP_CACHE_TTL = 600  # 10 minutes
+
+
+async def get_cached_serp(query: str) -> list[dict] | None:
+    try:
+        client = await _get_client()
+        if client is None:
+            return None
+        key = f"factguard:serp:{compute_claim_hash(query)}"
+        data = await client.get(key)
+        return json.loads(data) if data else None
+    except Exception as e:
+        logger.warning(f"Redis get_cached_serp failed: {e}")
+        return None
+
+
+async def set_cached_serp(query: str, results: list[dict]) -> None:
+    try:
+        client = await _get_client()
+        if client is None:
+            return
+        key = f"factguard:serp:{compute_claim_hash(query)}"
+        await client.setex(key, SERP_CACHE_TTL, json.dumps(results))
+    except Exception as e:
+        logger.warning(f"Redis set_cached_serp failed: {e}")
+
+
 async def set_job_result(job_id: str, data: dict) -> None:
     try:
         client = await _get_client()

@@ -196,9 +196,10 @@ export interface FinancialResult {
   jobId: string;
   mode: 'financial';
   query: string;
-  graph_data: GraphData;
-  analysis: FinancialAnalysis;
+  graph_data?: GraphData | null;
+  analysis?: FinancialAnalysis | null;
   sources: FinancialSource[];
+  enriching?: boolean;
 }
 
 // =========================

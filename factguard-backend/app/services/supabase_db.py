@@ -250,6 +250,22 @@ async def save_financial_result(
         logger.error(f"Failed to save financial result: {e}")
 
 
+async def update_financial_result(
+    job_id: str,
+    data: dict[str, Any],
+):
+    try:
+        await update(
+            "financial_results",
+            {"result": data},
+            "job_id",
+            job_id,
+        )
+        logger.debug(f"Financial result updated: {job_id}")
+    except Exception as e:
+        logger.error(f"Failed to update financial result: {e}")
+
+
 async def get_saved_financial_result(
     job_id: str,
 ) -> dict[str, Any] | None:
