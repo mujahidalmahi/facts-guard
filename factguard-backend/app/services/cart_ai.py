@@ -107,33 +107,100 @@ async def enrich_cart_listings(
     )
 
     try:
-        gemini_service = get_gemini_service()
-        model = gemini_service.get_model()
+        from google.api_core.exceptions import (
+            InternalServerError,
+            ResourceExhausted,
+            ServiceUnavailable,
+        )
 
         import asyncio
 
-        response = await asyncio.wait_for(
-            asyncio.to_thread(
-                model.generate_content,
-                user_prompt,
-            ),
-            timeout=15.0,
+        gemini_service = get_gemini_service()
+        max_gemini_retries = len(gemini_service.api_keys)
+
+        for attempt in range(max_gemini_retries):
+            try:
+                model = gemini_service.get_model()
+                timeout = 5.0 if attempt == 0 else 15.0
+
+                response = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        model.generate_content,
+                        user_prompt,
+                    ),
+                    timeout=timeout,
+                )
+
+                text = response.text.replace("```json", "").replace("```", "").strip()
+
+                result = json.loads(text)
+                logger.info(f"Cart AI enrichment completed: {result.get('verdict', 'unknown')}")
+                return result
+
+            except (
+                asyncio.TimeoutError,
+                ResourceExhausted,
+                InternalServerError,
+                ServiceUnavailable,
+            ):
+                remaining = max_gemini_retries - attempt - 1
+                logger.warning(
+                    f"Gemini attempt {attempt + 1}/{max_gemini_retries} "
+                    f"failed, {remaining} keys remaining"
+                )
+                if remaining > 0:
+                    gemini_service.rotate_key()
+                    await asyncio.sleep(1)
+                    continue
+                raise
+
+    except Exception as e:
+        logger.warning(f"Gemini cart enrichment failed: {e}")
+
+    # Fallback to DeepSeek
+    try:
+        from app.services.deepseek import call_deepseek
+
+        raw = await call_deepseek(
+            CART_SYSTEM_PROMPT,
+            user_prompt,
+            max_tokens=2048,
         )
 
-        text = response.text.replace("```json", "").replace("```", "").strip()
+        text = raw.replace("```json", "").replace("```", "").strip()
 
         result = json.loads(text)
-        logger.info(f"Cart AI enrichment completed: " f"{result.get('verdict', 'unknown')}")
+        logger.info(f"Cart AI enrichment completed via DeepSeek")
         return result
 
     except Exception as e:
-        logger.warning(f"Cart AI enrichment failed: {e}")
-        return {
-            "best_deal": None,
-            "price_range": None,
-            "market_average": None,
-            "warnings": [],
-            "variant_notes": None,
-            "recommendation": (f"Found {len(listings)} listings. " "Compare prices manually."),
-            "verdict": "Best deal found",
-        }
+        logger.warning(f"DeepSeek cart enrichment failed: {e}")
+
+    # Fallback to Groq (last resort)
+    try:
+        from app.services.groq_service import call_groq
+
+        raw = await call_groq(
+            CART_SYSTEM_PROMPT,
+            user_prompt,
+            max_tokens=2048,
+        )
+
+        text = raw.replace("```json", "").replace("```", "").strip()
+
+        result = json.loads(text)
+        logger.info(f"Cart AI enrichment completed via Groq")
+        return result
+
+    except Exception as e:
+        logger.warning(f"Groq cart enrichment also failed: {e}")
+
+    return {
+        "best_deal": None,
+        "price_range": None,
+        "market_average": None,
+        "warnings": [],
+        "variant_notes": None,
+        "recommendation": (f"Found {len(listings)} listings. " "Compare prices manually."),
+        "verdict": "Best deal found",
+    }

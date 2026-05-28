@@ -98,7 +98,7 @@ export default function ResultPage({ params }: { params: Promise<{ jobId: string
   const [data, setData] = useState<any>(null);
   const [error, setError] = useState(false);
   const [showGraph, setShowGraph] = useState(false);
-  const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [expandedSourceIndex, setExpandedSourceIndex] = useState<number | null>(null);
   const [sortKey, setSortKey] = useState<'credibility' | 'relevance'>('relevance');
   const [showAllSources, setShowAllSources] = useState(false);
   const mountedRef = useRef(true);
@@ -430,7 +430,7 @@ export default function ResultPage({ params }: { params: Promise<{ jobId: string
                         : source.credibility === 'Medium'
                         ? 'text-amber-400'
                         : 'text-red-400';
-                      const isExpanded = expandedRow === `${source.url}-${i}`;
+                      const isExpanded = expandedSourceIndex === i;
                       return (
                         <motion.tr
                           key={`${source.url}-${i}`}
@@ -438,7 +438,8 @@ export default function ResultPage({ params }: { params: Promise<{ jobId: string
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: i * 0.04, duration: 0.3 }}
                           className="border-b border-[var(--color-border-subtle)] hover:bg-[var(--color-bg-elevated)]/50 transition-colors cursor-pointer"
-                          onClick={() => setExpandedRow(isExpanded ? null : `${source.url}-${i}`)}
+                          style={isExpanded ? { backgroundColor: 'rgba(99,102,241,0.06)' } : undefined}
+                          onClick={() => setExpandedSourceIndex(isExpanded ? null : i)}
                         >
                           <td className="py-3 px-4 align-top">
                             <span className="data-label inline-block px-1.5 py-0.5 rounded border"
@@ -466,17 +467,18 @@ export default function ResultPage({ params }: { params: Promise<{ jobId: string
                                     </span>
                                   )}
                                 </div>
-                                <div className="data-label mt-0.5">
-                                  {(() => { try { return source.url ? new URL(source.url).hostname : '' } catch { return '' } })()}
+                                <div className="mt-0.5">
                                   {source.url && (
                                     <a
                                       href={source.url}
                                       target="_blank"
                                       rel="noopener noreferrer"
                                       onClick={(e) => e.stopPropagation()}
-                                      className="ml-1.5 inline-flex items-center gap-0.5 hover:text-[var(--color-accent-primary)] transition-colors align-middle"
+                                      className="inline-flex items-center gap-1 text-xs font-medium hover:text-[var(--color-accent-primary)] transition-colors break-all"
+                                      style={{ color: 'var(--color-accent-primary)' }}
                                     >
-                                      <ExternalLink className="w-2.5 h-2.5" />
+                                      {(() => { try { return new URL(source.url).hostname + new URL(source.url).pathname.slice(0, 60) } catch { return source.url } })()}
+                                      <ExternalLink className="w-3.5 h-3.5 shrink-0" />
                                     </a>
                                   )}
                                 </div>
@@ -528,6 +530,7 @@ export default function ResultPage({ params }: { params: Promise<{ jobId: string
               )}
             </motion.div>
           )}
+
         </div>
 
         {/* RIGHT COLUMN */}

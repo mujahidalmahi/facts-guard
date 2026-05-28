@@ -446,7 +446,44 @@ async def analyze_claim(
 
     logger.error("All Gemini API key retries exhausted")
 
-    # Fallback to Groq
+    # Fallback to DeepSeek
+    try:
+        if job_id:
+            await set_progress(
+                job_id,
+                "Falling back to DeepSeek AI...",
+            )
+
+        from app.services.deepseek import (
+            call_deepseek,
+        )
+
+        raw = await call_deepseek(
+            VERIFY_SYSTEM_PROMPT,
+            user_prompt,
+            max_tokens=4096,
+        )
+
+        result = parse_json_response(raw)
+
+        original_urls = {r["url"] for r in search_results if r.get("url")}
+        if original_urls:
+            result["sources"] = validate_source_urls(
+                result.get("sources", []),
+                original_urls,
+            )
+
+        if not _validate_response(result):
+            return _fallback_with_sources(search_results)
+
+        result["_provider"] = "deepseek"
+        logger.info("Claim analysis completed via DeepSeek fallback")
+        return result
+
+    except Exception as ds_err:
+        logger.warning(f"DeepSeek fallback failed: {ds_err}")
+
+    # Fallback to Groq (last resort)
     try:
         if job_id:
             await set_progress(

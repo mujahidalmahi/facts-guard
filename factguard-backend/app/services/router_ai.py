@@ -60,21 +60,61 @@ async def classify_query(
         "unsafe",
     }
 
-    for provider in ("gemini", "groq"):
+    for provider in ("gemini", "deepseek", "groq"):
         try:
             if provider == "gemini":
-                gemini_service = get_gemini_service()
-                model = gemini_service.get_model()
-
-                response = await asyncio.wait_for(
-                    asyncio.to_thread(
-                        model.generate_content,
-                        user_prompt,
-                    ),
-                    timeout=10.0,
+                from google.api_core.exceptions import (
+                    InternalServerError,
+                    ResourceExhausted,
+                    ServiceUnavailable,
                 )
 
-                text = response.text
+                gemini_service = get_gemini_service()
+                max_gemini_retries = len(gemini_service.api_keys)
+
+                for attempt in range(max_gemini_retries):
+                    try:
+                        model = gemini_service.get_model()
+                        timeout = 5.0 if attempt == 0 else 10.0
+
+                        response = await asyncio.wait_for(
+                            asyncio.to_thread(
+                                model.generate_content,
+                                user_prompt,
+                            ),
+                            timeout=timeout,
+                        )
+
+                        text = response.text
+                        break
+
+                    except (
+                        asyncio.TimeoutError,
+                        ResourceExhausted,
+                        InternalServerError,
+                        ServiceUnavailable,
+                    ):
+                        remaining = max_gemini_retries - attempt - 1
+                        logger.warning(
+                            f"Gemini attempt {attempt + 1}/{max_gemini_retries} "
+                            f"failed, {remaining} keys remaining"
+                        )
+                        if remaining > 0:
+                            gemini_service.rotate_key()
+                            await asyncio.sleep(1)
+                            continue
+                        raise
+
+            elif provider == "deepseek":
+                from app.services.deepseek import (
+                    call_deepseek,
+                )
+
+                text = await call_deepseek(
+                    ROUTER_SYSTEM_PROMPT,
+                    user_prompt,
+                    max_tokens=200,
+                )
 
             else:
                 from app.services.groq_service import (

@@ -1,3 +1,4 @@
+import asyncio
 import json
 from datetime import (
     datetime,
@@ -200,3 +201,41 @@ async def deepseek_financial_analysis(
     fallback = dict(FALLBACK_RESPONSE)
     fallback["analysis_date"] = today
     return fallback
+
+
+async def call_deepseek(
+    system: str,
+    user: str,
+    max_tokens: int = 4096,
+    model: str | None = None,
+) -> str:
+    """Generic DeepSeek/OpenRouter call for fallback scenarios.
+
+    Returns raw text response, similar to call_groq().
+    Raises ValueError if all keys exhausted.
+    """
+    keys = _get_api_keys()
+    resolved_model = model or settings.FINANCIAL_MODEL
+
+    for attempt, key in enumerate(keys):
+        try:
+            client = _get_client(key)
+            response = await asyncio.to_thread(
+                client.chat.completions.create,
+                model=resolved_model,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+                max_tokens=max_tokens,
+                temperature=0.2,
+            )
+            text = response.choices[0].message.content or ""
+            logger.info(f"DeepSeek call: {len(text)} chars (attempt {attempt + 1})")
+            return text
+
+        except Exception as e:
+            logger.error(f"DeepSeek attempt {attempt + 1} failed: {e}")
+            continue
+
+    raise ValueError("All DeepSeek API keys exhausted")
