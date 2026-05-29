@@ -107,9 +107,7 @@ function LoadingContent() {
   };
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center p-6 overflow-hidden"
-      style={{ backgroundColor: 'var(--color-bg-base)' }}
-    >
+    <div className="relative flex-1 flex items-center justify-center p-6 overflow-hidden">
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
         <div className="absolute -top-40 -left-40 w-[500px] h-[500px] rounded-full blur-[120px] opacity-20"
           style={{ backgroundColor: accentColor }}
@@ -126,7 +124,7 @@ function LoadingContent() {
         transition={{ duration: 0.4 }}
         className="relative z-10 w-full max-w-[600px]"
       >
-        <div className="relative overflow-hidden rounded-2xl scan-line"
+        <div className="dark relative overflow-hidden rounded-2xl scan-line"
           style={{
             backgroundColor: 'rgba(5,10,26,0.85)',
             border: '1px solid var(--color-border-default)',
