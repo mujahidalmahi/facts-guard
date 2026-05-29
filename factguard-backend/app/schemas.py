@@ -22,6 +22,29 @@ class VerifyRequest(BaseModel):
         return v
 
 
+class SummarizeRequest(BaseModel):
+    url: str = Field(
+        ...,
+        min_length=10,
+        max_length=2048,
+        description="The URL of the article to summarise",
+    )
+
+    @field_validator("url")
+    @classmethod
+    def validate_url(cls, v: str) -> str:
+        v = v.strip()
+        if contains_sql_injection_pattern(v):
+            raise ValueError("URL contains invalid characters or patterns")
+        if not (v.startswith("http://") or v.startswith("https://")):
+            raise ValueError("URL must begin with http:// or https://")
+        # Ensure there is a host after the scheme
+        remainder = v[v.index("//") + 2:]
+        if not remainder or remainder.startswith("/"):
+            raise ValueError("URL must include a valid host")
+        return v
+
+
 class SourceResponse(BaseModel):
     url: str = Field(..., description="URL of the source")
     title: str = Field(..., description="Title of the source article")

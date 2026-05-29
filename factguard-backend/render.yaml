@@ -9,3 +9,7 @@ services:
         value: production
       - key: FRONTEND_URL
         value: https://factguard.vercel.app
+      - key: AIML_API_MODEL
+        value: gpt-4o-mini
+      - key: AIML_API_ENABLED
+        value: "true"

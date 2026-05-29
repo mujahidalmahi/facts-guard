@@ -5,6 +5,13 @@ import { ExternalLink, ShieldCheck, AlertTriangle, AlertCircle } from 'lucide-re
 import type { LucideIcon } from 'lucide-react';
 import type { CartListingEntry } from '@/types';
 
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  USD: '$', EUR: '€', GBP: '£', INR: '₹', BDT: '৳', JPY: '¥', CNY: '¥', KRW: '₩', CAD: 'CA$', AUD: 'A$',
+};
+function cs(currency?: string): string {
+  return (currency && CURRENCY_SYMBOLS[currency]) || '$';
+}
+
 const TRUST_MAP: Record<string, { Icon: LucideIcon; color: string; label: string }> = {
   GREEN: { Icon: ShieldCheck, color: '#16a34a', label: 'Trusted' },
   YELLOW: { Icon: AlertCircle, color: '#d97706', label: 'Unverified' },
@@ -18,10 +25,11 @@ const COUNTERFEIT_COLORS: Record<string, string> = {
   High: 'var(--color-accent-red)',
 };
 
-function DealScoreRing({ score }: { score: number }) {
+function DealScoreRing({ score }: { score: number | null }) {
   const circumference = 2 * Math.PI * 14;
-  const offset = circumference - (score / 100) * circumference;
-  const color = score >= 70 ? '#10B981' : score >= 40 ? '#F59E0B' : '#EF4444';
+  const valid = score != null && score > 0;
+  const offset = valid ? circumference - (score / 100) * circumference : circumference;
+  const color = valid ? (score >= 70 ? '#10B981' : score >= 40 ? '#F59E0B' : '#EF4444') : 'var(--color-text-tertiary)';
 
   return (
     <div className="relative inline-flex items-center justify-center">
@@ -37,7 +45,7 @@ function DealScoreRing({ score }: { score: number }) {
           style={{ color, filter: `drop-shadow(0 0 4px ${color}66)` }}
         />
       </svg>
-      <span className="absolute text-[8px] font-mono font-bold" style={{ color }}>{score}</span>
+      <span className="absolute text-[8px] font-mono font-bold" style={{ color }}>{valid ? score : '—'}</span>
     </div>
   );
 }
@@ -73,15 +81,13 @@ export function CartProductCard({ listing }: { listing: CartListingEntry }) {
       </p>
 
       <div className="flex items-center justify-between">
-        <p className="text-2xl font-black" style={{ color: 'var(--color-text-primary)' }}>
-          ${listing.price?.toFixed(2)}
+        <p className="text-2xl font-black" style={{ color: listing.price != null && listing.price > 0 ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)' }}>
+          {listing.price != null && listing.price > 0 ? `${cs(listing.currency)}${listing.price.toFixed(2)}` : 'N/A'}
         </p>
-        {listing.deal_score > 0 && (
-          <div className="flex items-center gap-1.5">
-            <span className="text-[10px] font-mono" style={{ color: 'var(--color-text-tertiary)' }}>Deal</span>
-            <DealScoreRing score={listing.deal_score} />
-          </div>
-        )}
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] font-mono" style={{ color: 'var(--color-text-tertiary)' }}>Deal</span>
+          <DealScoreRing score={listing.deal_score} />
+        </div>
       </div>
 
       <div className="flex items-center gap-2 text-xs">

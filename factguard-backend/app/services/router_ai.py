@@ -1,6 +1,6 @@
-import json
-
+from app.config import settings
 from app.logging_config import get_logger
+from app.utils.parsing import parse_json_response
 
 logger = get_logger("router_ai")
 
@@ -60,9 +60,19 @@ async def classify_query(
         "unsafe",
     }
 
-    for provider in ("gemini", "deepseek", "groq"):
+    for provider in ("aiml", "gemini", "deepseek", "groq"):
         try:
-            if provider == "gemini":
+            if provider == "aiml":
+                from app.services.aiml_service import call_aiml
+
+                text = await call_aiml(
+                    ROUTER_SYSTEM_PROMPT,
+                    user_prompt,
+                    model=settings.AIML_ROUTER_MODEL,
+                    max_tokens=200,
+                )
+
+            elif provider == "gemini":
                 from google.api_core.exceptions import (
                     InternalServerError,
                     ResourceExhausted,
@@ -127,9 +137,7 @@ async def classify_query(
                     max_tokens=200,
                 )
 
-            text = text.replace("```json", "").replace("```", "").strip()
-
-            result = json.loads(text)
+            result = parse_json_response(text)
 
             mode = result.get("mode", "unclear")
             if mode not in valid_modes:

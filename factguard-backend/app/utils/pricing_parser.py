@@ -116,6 +116,19 @@ SPEC_PATTERNS = [
 ]
 
 
+def extract_currency(text: str) -> str:
+    """Detect which currency symbol appears in raw text."""
+    if not text:
+        return "USD"
+    for sym, cur in [("₹", "INR"), ("€", "EUR"), ("£", "GBP"), ("BDT", "BDT"), ("$", "USD")]:
+        if sym in text:
+            return cur
+    for pat, cur in [(r"\bINR\b", "INR"), (r"\bUSD\b", "USD"), (r"\bEUR\b", "EUR"), (r"\bGBP\b", "GBP"), (r"\bBDT\b", "BDT")]:
+        if re.search(pat, text, re.IGNORECASE):
+            return cur
+    return "USD"
+
+
 def extract_price(text: str) -> Optional[float]:
     for pattern in PRICE_PATTERNS:
         match = pattern.search(text)

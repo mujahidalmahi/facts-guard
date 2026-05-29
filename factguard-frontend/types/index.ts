@@ -277,3 +277,5 @@ export const MODE_META: Record<AppMode, ModeMeta> = {
   security: { label: 'Security', sublabel: 'Threat Surface', color: '#F59E0B', icon: 'alert' },
   cart: { label: 'Cart', sublabel: 'Price Trust', color: '#06B6D4', icon: 'cart' },
 };
+
+

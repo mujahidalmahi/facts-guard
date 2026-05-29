@@ -77,11 +77,9 @@ class GeminiService:
     def get_next_key(
         self,
     ) -> str:
-        key = self.api_keys[self._current_key_index % len(self.api_keys)]
-
-        self._current_key_index += 1
-
-        return key
+        with self._lock:
+            self._current_key_index = (self._current_key_index + 1) % len(self.api_keys)
+            return self.api_keys[self._current_key_index]
 
     def rotate_key(
         self,
@@ -89,7 +87,8 @@ class GeminiService:
         # Thread-safe key rotation
         with self._lock:
             try:
-                key = self.get_next_key()
+                self._current_key_index = (self._current_key_index + 1) % len(self.api_keys)
+                key = self.api_keys[self._current_key_index]
 
                 self._client = genai.Client(api_key=key)
 

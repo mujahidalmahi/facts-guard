@@ -1,9 +1,10 @@
-import json
 import re
 from urllib.parse import urlparse
 from datetime import datetime, timezone
 
+from app.config import settings
 from app.logging_config import get_logger
+from app.utils.parsing import parse_json_response
 
 logger = get_logger("credibility")
 
@@ -122,7 +123,6 @@ async def evaluate_source_credibility(
     if not sources:
         return []
 
-    from app.dependencies import get_gemini_service
     import asyncio
 
     sources_lines = []
@@ -133,6 +133,24 @@ async def evaluate_source_credibility(
     user_prompt = CREDIBILITY_USER_PROMPT.format(
         sources_list=sources_list_str,
     )
+
+    # Primary: AI/ML API
+    if settings.AIML_API_ENABLED and settings.aiml_api_keys_list:
+        try:
+            from app.services.aiml_service import call_aiml
+
+            raw = await call_aiml(CREDIBILITY_SYSTEM_PROMPT, user_prompt, max_tokens=1024)
+            ratings = parse_json_response(raw)
+            for rating in ratings:
+                idx = rating.get("index")
+                if idx is not None and idx < len(sources):
+                    sources[idx]["credibility"] = rating.get("credibility", "Medium")
+                    sources[idx]["credibility_reason"] = rating.get("reason", "")
+            return _enrich_with_scoring(sources)
+        except Exception as e:
+            logger.warning(f"AIML credibility evaluation failed: {e}")
+
+    from app.dependencies import get_gemini_service
 
     try:
         from google.api_core.exceptions import (
@@ -160,9 +178,7 @@ async def evaluate_source_credibility(
                     timeout=timeout,
                 )
 
-                text = response.text.replace("```json", "").replace("```", "").strip()
-
-                ratings = json.loads(text)
+                ratings = parse_json_response(response.text)
 
                 for rating in ratings:
                     idx = rating.get("index")
@@ -202,9 +218,7 @@ async def evaluate_source_credibility(
             max_tokens=1024,
         )
 
-        text = raw.replace("```json", "").replace("```", "").strip()
-
-        ratings = json.loads(text)
+        ratings = parse_json_response(raw)
 
         for rating in ratings:
             idx = rating.get("index")
@@ -227,9 +241,7 @@ async def evaluate_source_credibility(
             max_tokens=1024,
         )
 
-        text = raw.replace("```json", "").replace("```", "").strip()
-
-        ratings = json.loads(text)
+        ratings = parse_json_response(raw)
 
         for rating in ratings:
             idx = rating.get("index")

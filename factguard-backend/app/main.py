@@ -1,5 +1,10 @@
 import os
+import sys
+import asyncio
 import uuid
+
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
 from contextlib import (
     asynccontextmanager,
@@ -176,11 +181,16 @@ async def root():
 @app.get("/health")
 async def health():
     cb_status = await routing_health()
+    aiml_status = {}
+    if settings.AIML_API_ENABLED and settings.aiml_api_keys_list:
+        from app.services.aiml_service import get_aiml_key_status
+        aiml_status = await get_aiml_key_status()
     return {
         "status": "ok",
         "version": settings.APP_VERSION,
         "environment": settings.ENVIRONMENT,
         "circuit_breakers": cb_status,
+        "aiml_keys": aiml_status,
     }
 
 

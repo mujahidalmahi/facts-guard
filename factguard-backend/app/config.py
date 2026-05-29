@@ -37,6 +37,8 @@ class Settings(BaseSettings):
 
     GROQ_API_KEY: str = ""
 
+    GROQ_API_KEYS: str = ""
+
     BRIGHTDATA_API_KEY: str = ""
 
     BRIGHTDATA_SERP_ZONE: str = ""
@@ -44,6 +46,8 @@ class Settings(BaseSettings):
     BRIGHTDATA_BROWSER_ZONE: str = ""
 
     BRIGHTDATA_WSS: str = ""
+
+    BRIGHTDATA_MCP_URL: str = "https://mcp.brightdata.com/mcp?token=4271eeee-46ac-4864-8efd-1b8261f8fe64"
 
     BROWSER_TIMEOUT: int = 45
 
@@ -80,6 +84,24 @@ class Settings(BaseSettings):
     FINANCIAL_MODEL: str = "deepseek/deepseek-chat-v3-0324"
 
     SNIPPET_MAX_CHARS: int = 200
+
+    AIML_API_KEYS: str = ""
+
+    AIML_API_MODEL: str = "openai/gpt-5-2-chat-latest"
+
+    AIML_API_ENABLED: bool = True
+
+    AIML_VERIFY_MODEL: str = "openai/gpt-5-2-chat-latest"
+
+    AIML_FINANCIAL_MODEL: str = "anthropic/claude-opus-4.8"
+
+    AIML_ROUTER_MODEL: str = "openai/gpt-4.1-nano-2025-04-14"
+
+    AIML_CART_MODEL: str = "deepseek/deepseek-v4-flash"
+
+    @property
+    def aiml_api_keys_list(self) -> list[str]:
+        return [k.strip() for k in self.AIML_API_KEYS.split(",") if k.strip()]
 
     class Config:
         env_file = str(Path(__file__).resolve().parent.parent / ".env")

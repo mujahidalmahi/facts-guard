@@ -135,7 +135,7 @@ async def search_with_fallback(query: str, max_results: int = 8) -> list[dict]:
         return cached
 
     mcp_results = await _call_with_circuit_breaker(
-        "mcp_discover", mcp_discover, query, threshold=2, cooldown=15.0
+        "mcp_discover", mcp_discover, query, threshold=3, cooldown=30.0
     )
     if mcp_results:
         logger.info(f"MCP Discover returned {len(mcp_results)} results")

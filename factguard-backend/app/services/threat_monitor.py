@@ -167,9 +167,11 @@ def _classify_threat(result: dict) -> dict | None:
 
 async def generate_compliance_report(threats: list[dict]) -> str:
     """Generate a timestamped compliance report from threats."""
+    from datetime import datetime, timezone
+
     report_lines = [
         "=== FACTGUARD COMPLIANCE REPORT ===",
-        f"Generated: {__import__('datetime').datetime.now(__import__('pytz').UTC).isoformat()}",
+        f"Generated: {datetime.now(timezone.utc).isoformat()}",
         f"Total threats: {len(threats)}",
         "",
     ]

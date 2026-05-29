@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Shield, TrendingUp, ShoppingCart, AlertTriangle, Clock, ChevronLeft, ChevronRight, Eye, Search, Trash2 } from 'lucide-react';
+import { Shield, TrendingUp, ShoppingCart, AlertTriangle, Clock, ChevronLeft, ChevronRight, Eye, Search } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { HistorySkeleton } from '@/components/Skeleton';
 

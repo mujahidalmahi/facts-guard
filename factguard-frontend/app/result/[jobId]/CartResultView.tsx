@@ -5,15 +5,25 @@ import { ShoppingCart, CheckCircle2, XCircle, AlertTriangle, ExternalLink, Trend
 import type { CartResult, CartListingEntry } from '@/types';
 import { useMemo } from 'react';
 
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  USD: '$', EUR: '€', GBP: '£', INR: '₹', BDT: '৳', JPY: '¥', CNY: '¥', KRW: '₩', CAD: 'CA$', AUD: 'A$',
+};
+const CURRENCY_DEFAULT = '$';
+
+function cs(currency?: string): string {
+  return (currency && CURRENCY_SYMBOLS[currency]) || CURRENCY_DEFAULT;
+}
+
 const TRUST_CONFIG: Record<'GREEN' | 'YELLOW' | 'RED', { color: string; label: string; border: string; badgeBg: string }> = {
   GREEN: { color: '#10B981', label: 'TRUSTED', border: '4px solid #10B981', badgeBg: 'rgba(16, 185, 129, 0.15)' },
   YELLOW: { color: '#F59E0B', label: 'CAUTION', border: '4px solid #F59E0B', badgeBg: 'rgba(245, 158, 11, 0.15)' },
   RED: { color: '#EF4444', label: 'RISKY', border: '4px solid #EF4444', badgeBg: 'rgba(239, 68, 68, 0.15)' },
 };
 
-function DealScoreRing({ score, color }: { score: number; color: string }) {
+function DealScoreRing({ score, color }: { score: number | null; color: string }) {
   const circumference = 2 * Math.PI * 20;
-  const offset = circumference - (score / 100) * circumference;
+  const valid = score != null && score > 0;
+  const offset = valid ? circumference - (score / 100) * circumference : circumference;
   return (
     <div className="relative w-12 h-12">
       <svg className="w-full h-full -rotate-90" viewBox="0 0 48 48">
@@ -28,7 +38,7 @@ function DealScoreRing({ score, color }: { score: number; color: string }) {
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <div className="font-mono text-xs font-bold" style={{ color }}>{score}</div>
+        <div className="font-mono text-xs font-bold" style={{ color: valid ? color : 'var(--color-text-tertiary)' }}>{valid ? score : '—'}</div>
       </div>
     </div>
   );
@@ -102,12 +112,12 @@ function ListingCard({ listing, index, isBest }: { listing: CartListingEntry; in
         <div className="flex items-end justify-between mb-4">
           <div>
             <div className="data-label mb-1">PRICE</div>
-            <div className="text-3xl font-black" style={{ color: trust.color, fontFamily: 'var(--font-sora)' }}>
-              ${listing.price?.toLocaleString() ?? '0'}
+            <div className="text-3xl font-black" style={{ color: listing.price != null && listing.price > 0 ? trust.color : '#7E8FAD', fontFamily: 'var(--font-sora)' }}>
+              {listing.price != null && listing.price > 0 ? `${cs(listing.currency)}${listing.price.toLocaleString()}` : 'N/A'}
             </div>
           </div>
           <div className="text-center">
-            <DealScoreRing score={listing.deal_score ?? 0} color={trust.color} />
+            <DealScoreRing score={listing.deal_score} color={trust.color} />
             <div className="data-label" style={{ fontSize: '9px', marginTop: '2px' }}>Deal Score</div>
           </div>
         </div>
@@ -181,26 +191,38 @@ export function CartResultView({ data }: { data: CartResult }) {
     );
   }
 
-  const best = sorted.find((l) => l.trust_level !== 'RED') || sorted[0];
-  const prices = listings.map((l) => l.price ?? 0);
-  const minPrice = Math.min(...prices);
-  const maxPrice = Math.max(...prices);
-  const avgPrice = prices.reduce((a, b) => a + b, 0) / prices.length || 0;
+  const best = sorted.find((l) => l.trust_level !== 'RED' && l.price != null && l.price > 0)
+    || sorted.find((l) => l.price != null && l.price > 0)
+    || null;
+  const validPrices = listings.map((l) => l.price).filter((p): p is number => p != null && p > 0 && !isNaN(p));
+  const minPrice = validPrices.length > 0 ? Math.min(...validPrices) : null;
+  const maxPrice = validPrices.length > 0 ? Math.max(...validPrices) : null;
+  const avgPrice = validPrices.length > 0 ? validPrices.reduce((a, b) => a + b, 0) / validPrices.length : null;
 
-  const priceSpread = minPrice > 0 ? (maxPrice - minPrice) / avgPrice : 0;
-  const trend = priceSpread > 0.4 ? 'Dropping' : priceSpread > 0.2 ? 'Stable' : 'Rising';
+  const priceSpread = minPrice != null && minPrice > 0 ? (maxPrice! - minPrice) / avgPrice! : 0;
+  const hasValidPrices = validPrices.length > 0;
+  const trend = hasValidPrices ? (priceSpread > 0.4 ? 'Dropping' : priceSpread > 0.2 ? 'Stable' : 'Rising') : null;
   const TrendIcon = trend === 'Dropping' ? TrendingDown : trend === 'Rising' ? TrendingUp : Minus;
   const trendColor = trend === 'Dropping' ? '#10B981' : trend === 'Rising' ? '#EF4444' : '#F59E0B';
 
-  const recommendation = sorted.filter((l) => l.trust_level === 'RED').length > listings.length / 2
+  const displayCurrency = best?.currency || (validPrices.length > 0 ? sorted.find(l => l.price != null && l.price > 0)?.currency : undefined);
+  const sym = cs(displayCurrency);
+
+  const redCount = sorted.filter((l) => l.trust_level === 'RED' && l.price != null && l.price > 0).length;
+  const greenCount = sorted.filter((l) => l.trust_level === 'GREEN').length;
+  const hasSuspiciouslyLow = hasValidPrices && validPrices.some(p => p < avgPrice! * 0.5);
+
+  const recommendation = redCount > sorted.length / 2
     ? 'High number of suspicious listings detected. Exercise extreme caution — many prices are significantly below wholesale cost, indicating counterfeit risk.'
-    : sorted.filter((l) => l.trust_level === 'GREEN').length >= 3
+    : hasSuspiciouslyLow
+    ? 'Warning: Some prices are suspiciously low compared to market average. Verify seller authenticity before purchasing.'
+    : greenCount >= 3
     ? 'Multiple trusted sources available. We recommend purchasing from the best-priced GREEN-rated merchant to ensure authenticity and warranty coverage.'
     : 'Consider waiting for additional inventory from authorized retailers. Current options show mixed trust levels.';
 
   const warnings: string[] = [];
   if (listings.some((l) => l.counterfeit_risk === 'High')) warnings.push('Some listings flagged with HIGH counterfeit risk. Avoid RED-rated merchants.');
-  if (priceSpread > 0.5) warnings.push('Unusually wide price spread suggests fake/clone products in the market.');
+  if (hasValidPrices && priceSpread > 0.5) warnings.push('Unusually wide price spread suggests fake/clone products in the market.');
   if (listings.some((l) => l.condition === 'Unknown')) warnings.push('Some sellers do not disclose product condition — verify before purchasing.');
 
   return (
@@ -220,31 +242,47 @@ export function CartResultView({ data }: { data: CartResult }) {
         >
           <div>
             <div className="data-label mb-1">BEST PRICE</div>
-            <div className="font-mono text-2xl font-black" style={{ color: 'var(--color-accent-emerald)' }}>${best.price?.toLocaleString() ?? 'N/A'}</div>
-            <div className="text-xs mt-1" style={{ color: 'var(--color-text-secondary)' }}>at {best.merchant}</div>
+            <div className="font-mono text-2xl font-black" style={{ color: best != null ? 'var(--color-accent-emerald)' : 'var(--color-text-tertiary)' }}>
+              {best != null && best.price != null && best.price > 0 ? `${sym}${best.price.toLocaleString()}` : 'N/A'}
+            </div>
+            <div className="text-xs mt-1" style={{ color: 'var(--color-text-secondary)' }}>{best != null ? `at ${best.merchant}` : ''}</div>
           </div>
           <div>
             <div className="data-label mb-1">MARKET RANGE</div>
-            <div className="font-mono text-lg" style={{ color: 'var(--color-text-primary)' }}>${minPrice.toLocaleString()} – ${maxPrice.toLocaleString()}</div>
-            <div className="text-xs mt-1" style={{ color: 'var(--color-text-secondary)' }}>Avg: ${Math.round(avgPrice).toLocaleString()}</div>
+            <div className="font-mono text-lg" style={{ color: 'var(--color-text-primary)' }}>
+              {minPrice != null ? `${sym}${minPrice.toLocaleString()} – ${sym}${maxPrice!.toLocaleString()}` : 'N/A'}
+            </div>
+            <div className="text-xs mt-1" style={{ color: 'var(--color-text-secondary)' }}>
+              {avgPrice != null ? `Avg: ${sym}${Math.round(avgPrice).toLocaleString()}` : 'N/A'}
+            </div>
           </div>
           <div>
             <div className="data-label mb-1">PRICE TREND</div>
             <div className="flex items-center gap-2 text-lg font-semibold" style={{ color: trendColor }}>
-              <TrendIcon className="w-5 h-5" />
-              {trend}
+              {trend != null ? (
+                <>
+                  <TrendIcon className="w-5 h-5" />
+                  {trend}
+                </>
+              ) : (
+                <span style={{ color: 'var(--color-text-tertiary)' }}>N/A</span>
+              )}
             </div>
           </div>
           <div>
             <div className="data-label mb-1">BEST TIME TO BUY</div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-bold"
-              style={{
-                color: trend === 'Dropping' ? '#10B981' : trend === 'Rising' ? '#EF4444' : '#F59E0B',
-                backgroundColor: trend === 'Dropping' ? 'rgba(16, 185, 129, 0.1)' : trend === 'Rising' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)',
-              }}
-            >
-              {trend === 'Dropping' ? 'BUY NOW' : trend === 'Rising' ? 'URGENT' : 'WAIT'}
-            </div>
+            {trend != null ? (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-bold"
+                style={{
+                  color: trend === 'Dropping' ? '#10B981' : trend === 'Rising' ? '#EF4444' : '#F59E0B',
+                  backgroundColor: trend === 'Dropping' ? 'rgba(16, 185, 129, 0.1)' : trend === 'Rising' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+                }}
+              >
+                {trend === 'Dropping' ? 'BUY NOW' : trend === 'Rising' ? 'URGENT' : 'WAIT'}
+              </div>
+            ) : (
+              <div className="text-sm font-bold" style={{ color: 'var(--color-text-tertiary)' }}>N/A</div>
+            )}
           </div>
         </div>
       </motion.div>

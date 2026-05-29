@@ -2,6 +2,7 @@ import json
 
 import yfinance as yf
 from asyncio import Semaphore
+from app.utils.parsing import parse_json_response
 from app.services.supabase_db import (
     save_financial_result,
     update_financial_result,
@@ -12,6 +13,7 @@ from datetime import (
     timezone,
 )
 
+from app.config import settings
 from app.logging_config import (
     get_logger,
 )
@@ -347,12 +349,9 @@ async def _fetch_chart_data(query: str) -> dict | None:
     yf_task = asyncio.create_task(asyncio.to_thread(_try_yfinance_chart, query))
     cg_task = asyncio.create_task(_try_coingecko_chart(query))
 
-    for task in [yf_task, cg_task]:
-        result = await task
-        if result is not None:
-            for t in [yf_task, cg_task]:
-                if t is not task and not t.done():
-                    t.cancel()
+    results = await asyncio.gather(yf_task, cg_task, return_exceptions=True)
+    for result in results:
+        if isinstance(result, dict) and result is not None:
             return result
     return None
 
@@ -423,6 +422,24 @@ async def _run_ai_analysis(
     enriched_analysis = None
     today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
+    # Primary: AI/ML API
+    if settings.AIML_API_ENABLED and settings.aiml_api_keys_list:
+        try:
+            from app.services.aiml_service import call_aiml
+
+            aiml_user = FINANCIAL_USER_PROMPT.format(
+                today=today_str,
+                query=query,
+                search_context_block=search_context,
+            )
+            raw = await call_aiml(FINANCIAL_SYSTEM_PROMPT, aiml_user, model=settings.AIML_FINANCIAL_MODEL, max_tokens=4096)
+            enriched_analysis = parse_json_response(raw)
+            enriched_analysis["_provider"] = "aiml"
+            logger.info("Financial analysis completed via AI/ML API")
+            return enriched_analysis
+        except Exception as e:
+            logger.warning(f"AIML financial analysis failed: {e}")
+
     try:
         from app.dependencies import get_gemini_service
         from google.api_core.exceptions import (
@@ -453,8 +470,7 @@ async def _run_ai_analysis(
                     timeout=timeout,
                 )
 
-                gemini_text = gemini_resp.text.replace("```json", "").replace("```", "").strip()
-                enriched_analysis = json.loads(gemini_text)
+                enriched_analysis = parse_json_response(gemini_resp.text)
                 enriched_analysis["_provider"] = "gemini"
                 logger.info("Financial analysis completed via Gemini")
                 break
@@ -503,8 +519,7 @@ async def _run_ai_analysis(
                 max_tokens=4096,
             )
 
-            groq_text = groq_raw.replace("```json", "").replace("```", "").strip()
-            enriched_analysis = json.loads(groq_text)
+            enriched_analysis = parse_json_response(groq_raw)
             enriched_analysis["_provider"] = "groq"
             logger.info("Financial analysis completed via Groq")
         except Exception as e:

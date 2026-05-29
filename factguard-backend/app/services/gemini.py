@@ -11,6 +11,7 @@ from google.api_core.exceptions import (
     ServiceUnavailable,
 )
 
+from app.config import settings
 from app.dependencies import (
     get_gemini_service,
 )
@@ -301,6 +302,29 @@ async def analyze_claim(
         search_context_block=search_context_block,
     )
 
+    # Primary: AI/ML API
+    if settings.AIML_API_ENABLED and settings.aiml_api_keys_list:
+        try:
+            if job_id:
+                await set_progress(job_id, "Analysing with AI/ML API...")
+
+            from app.services.aiml_service import call_aiml
+            raw = await call_aiml(VERIFY_SYSTEM_PROMPT, user_prompt, model=settings.AIML_VERIFY_MODEL, max_tokens=4096)
+            result = parse_json_response(raw)
+            original_urls = {r["url"] for r in search_results if r.get("url")}
+            if original_urls:
+                result["sources"] = validate_source_urls(result.get("sources", []), original_urls)
+            if not _validate_response(result):
+                return _fallback_with_sources(search_results)
+            result["_provider"] = "aiml"
+            logger.info("Claim analysis completed via AI/ML API")
+            return result
+        except ValueError:
+            logger.warning("AIML keys exhausted — falling back")
+        except Exception as aiml_err:
+            logger.warning(f"AIML failed: {aiml_err}")
+
+    # Fallback: Gemini with key rotation
     gemini_service = get_gemini_service()
 
     max_retries = len(gemini_service.api_keys)
@@ -310,7 +334,7 @@ async def analyze_claim(
             if job_id:
                 await set_progress(
                     job_id,
-                    "Analysing with AI...",
+                    "Analysing with Gemini...",
                 )
 
             model = gemini_service.get_model()
@@ -350,7 +374,7 @@ async def analyze_claim(
             if not _validate_response(result):
                 return _fallback_with_sources(search_results)
 
-            logger.info("Claim analysis completed successfully")
+            logger.info("Claim analysis completed via Gemini")
 
             return result
 

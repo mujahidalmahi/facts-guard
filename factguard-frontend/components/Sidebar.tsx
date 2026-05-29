@@ -27,6 +27,7 @@ const HEALTH_SOURCES = [
   { key: 'crawl', label: 'Crawl API', color: '#06B6D4' },
   { key: 'proxy', label: 'Proxy Net', color: '#F59E0B' },
   { key: 'mcp', label: 'MCP Server', color: '#10B981' },
+  { key: 'aiml', label: 'AI/ML API', color: '#EC4899' },
 ];
 
 interface HistoryEntry {

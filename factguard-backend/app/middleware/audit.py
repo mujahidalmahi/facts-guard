@@ -12,13 +12,15 @@ logger = get_logger("audit")
 
 class AuditMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        response = await call_next(request)
-
+        # Read body BEFORE calling next — the stream can only be consumed once.
+        # We cache it so the downstream handler can still read it.
         try:
             body_bytes = await request.body()
             body = json.loads(body_bytes) if body_bytes else {}
         except (json.JSONDecodeError, RuntimeError):
             body = {}
+
+        response = await call_next(request)
 
         if request.url.path.startswith("/health"):
             return response

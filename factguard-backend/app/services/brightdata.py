@@ -1,3 +1,4 @@
+import asyncio
 import re
 from urllib.parse import quote
 
@@ -15,7 +16,9 @@ logger = get_logger("brightdata")
 BRIGHTDATA_ENDPOINT = "https://api.brightdata.com/request"
 BRIGHTDATA_CRAWL_ENDPOINT = "https://api.brightdata.com/crawl"
 BRIGHTDATA_BROWSER_ENDPOINT = "https://api.brightdata.com/browser"
-BRIGHTDATA_MCP_ENDPOINT = "https://api.brightdata.com/mcp"
+
+_mcp_disabled: bool = False
+_mcp_warned: bool = False
 
 PAYWALL_DOMAINS = [
     "bloomberg.com",
@@ -210,59 +213,65 @@ async def unlocker_scrape(url: str) -> Optional[str]:
 
 
 async def scrape_page_full(url: str) -> Optional[str]:
-    """Fetch full HTML of a page via Scraping Browser CDP (no truncation)."""
+    """Fetch full HTML of a page via Scraping Browser CDP (no truncation).
+
+    Uses sync_playwright inside a thread to avoid Windows asyncio subprocess issues.
+    """
     wss_url = settings.BRIGHTDATA_WSS
     if not wss_url:
         logger.warning("BRIGHTDATA_WSS not configured")
         return None
-    try:
-        from playwright.async_api import async_playwright
 
-        async with async_playwright() as p:
+    def _run() -> str | None:
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as p:
             logger.info(f"Connecting to BrightData CDP for: {url}")
-            browser = await p.chromium.connect_over_cdp(
+            browser = p.chromium.connect_over_cdp(
                 wss_url, timeout=settings.BROWSER_TIMEOUT * 1000 + 5000
             )
-            page = await browser.new_page()
-            await page.goto(
-                url, wait_until="domcontentloaded", timeout=settings.BROWSER_TIMEOUT * 1000
-            )
-            html = await page.evaluate("() => document.documentElement.outerHTML")
-            await page.close()
-            await browser.close()
-
+            page = browser.new_page()
+            page.goto(url, wait_until="domcontentloaded", timeout=settings.BROWSER_TIMEOUT * 1000)
+            html = page.evaluate("() => document.documentElement.outerHTML")
+            page.close()
+            browser.close()
         logger.info(f"scrape_page_full: {url} ({len(html)} chars)")
         return html
+
+    try:
+        return await asyncio.to_thread(_run)
     except Exception as e:
         logger.warning(f"scrape_page_full failed for {url}: {e}")
         return None
 
 
 async def browser_render(url: str) -> Optional[str]:
-    """Scraping Browser via BrightData CDP WebSocket proxy."""
+    """Scraping Browser via BrightData CDP WebSocket proxy.
+
+    Uses sync_playwright inside a thread to avoid Windows asyncio subprocess issues.
+    """
     wss_url = settings.BRIGHTDATA_WSS
     if not wss_url:
         logger.warning("BRIGHTDATA_WSS not configured — skipping browser render")
         return None
-    try:
-        from playwright.async_api import async_playwright
 
-        async with async_playwright() as p:
+    def _run() -> str | None:
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as p:
             logger.info(f"Connecting to BrightData CDP...")
-            browser = await p.chromium.connect_over_cdp(
+            browser = p.chromium.connect_over_cdp(
                 wss_url, timeout=settings.BROWSER_TIMEOUT * 1000 + 5000
             )
-            page = await browser.new_page()
-            await page.goto(
-                url, wait_until="domcontentloaded", timeout=settings.BROWSER_TIMEOUT * 1000
-            )
-            body_text = await page.evaluate("() => document.body.innerText")
-            await page.close()
-            await browser.close()
-
+            page = browser.new_page()
+            page.goto(url, wait_until="domcontentloaded", timeout=settings.BROWSER_TIMEOUT * 1000)
+            body_text = page.evaluate("() => document.body.innerText")
+            page.close()
+            browser.close()
         text = (body_text or "")[:5000]
         logger.info(f"Scraping Browser rendered: {url} ({len(text)} chars)")
         return text
+
+    try:
+        return await asyncio.to_thread(_run)
     except Exception as e:
         logger.warning(f"Scraping Browser (CDP) failed for {url}: {e}")
         return None
@@ -310,9 +319,22 @@ async def browser_extract_text(
 
 async def mcp_discover(query: str) -> list[dict]:
     """BrightData MCP Discover action."""
+    global _mcp_disabled, _mcp_warned
+
+    if _mcp_disabled:
+        return []
+
     api_key = _get_api_key()
     if not api_key:
         return []
+
+    mcp_url = settings.BRIGHTDATA_MCP_URL
+    if not mcp_url:
+        if not _mcp_warned:
+            logger.warning("BRIGHTDATA_MCP_URL not set — MCP discover disabled")
+            _mcp_warned = True
+        return []
+
     try:
         payload = {
             "action": "discover",
@@ -321,11 +343,20 @@ async def mcp_discover(query: str) -> list[dict]:
         }
         async with httpx.AsyncClient() as client:
             resp = await client.post(
-                BRIGHTDATA_MCP_ENDPOINT, json=payload, headers=_headers(), timeout=20
+                mcp_url, json=payload, headers=_headers(), timeout=20
             )
+            if resp.status_code == 404:
+                if not _mcp_warned:
+                    logger.warning(
+                        f"MCP URL {mcp_url} returned 404 — disabling MCP discover. "
+                        "Set BRIGHTDATA_MCP_URL env var to the correct endpoint."
+                    )
+                    _mcp_warned = True
+                _mcp_disabled = True
+                return []
             resp.raise_for_status()
             data = resp.json()
-        results = data.get("results", [])
+        results = data.get("results", []) if isinstance(data, dict) else []
         logger.info(f"MCP Discover returned {len(results)} results")
         return results
     except Exception as e:

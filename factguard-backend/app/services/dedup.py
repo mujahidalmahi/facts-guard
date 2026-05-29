@@ -34,7 +34,11 @@ async def dedup(
             future.set_exception(e)
         raise
     finally:
+        # Schedule cleanup without blocking the current coroutine
+        async def _cleanup():
+            await asyncio.sleep(ttl)
+            _inflight.pop(key, None)
+            _inflight_ttl.pop(key, None)
+
         _inflight_ttl[key] = time.monotonic() + ttl
-        await asyncio.sleep(ttl)
-        _inflight.pop(key, None)
-        _inflight_ttl.pop(key, None)
+        asyncio.ensure_future(_cleanup())

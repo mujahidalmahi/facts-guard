@@ -165,7 +165,8 @@ async def deepseek_financial_analysis(
 
             client = _get_client(key)
 
-            response = client.chat.completions.create(
+            response = await asyncio.to_thread(
+                client.chat.completions.create,
                 model=settings.FINANCIAL_MODEL,
                 messages=[
                     {
