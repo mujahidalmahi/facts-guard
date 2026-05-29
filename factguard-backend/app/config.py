@@ -27,18 +27,6 @@ class Settings(BaseSettings):
 
     CORS_ALLOW_HEADERS: list[str] = ["*"]
 
-    GEMINI_API_KEYS: str = ""
-
-    GEMINI_MODEL_NAME: str = "gemini-2.5-flash"
-
-    DEEPSEEK_API_KEY: str = ""
-
-    DEEPSEEK_API_KEYS: str = ""
-
-    GROQ_API_KEY: str = ""
-
-    GROQ_API_KEYS: str = ""
-
     BRIGHTDATA_API_KEY: str = ""
 
     BRIGHTDATA_SERP_ZONE: str = ""
@@ -47,17 +35,11 @@ class Settings(BaseSettings):
 
     BRIGHTDATA_WSS: str = ""
 
-    BRIGHTDATA_MCP_URL: str = "https://mcp.brightdata.com/mcp?token=4271eeee-46ac-4864-8efd-1b8261f8fe64"
-
     BROWSER_TIMEOUT: int = 45
 
     MAX_BROWSER_PAGES: int = 1
 
     CACHE_TTL_BROWSER: int = 3600
-
-    CLAUDE_API_KEY: str = ""
-
-    CLAUDE_API_KEYS: str = ""
 
     SUPABASE_URL: Optional[str] = None
 
@@ -77,12 +59,6 @@ class Settings(BaseSettings):
 
     REDIS_URL: Optional[str] = None
 
-    ROUTER_MODEL: str = "gemini-2.5-flash"
-
-    VERIFY_MODEL: str = "gemini-2.5-flash"
-
-    FINANCIAL_MODEL: str = "deepseek/deepseek-chat-v3-0324"
-
     SNIPPET_MAX_CHARS: int = 200
 
     AIML_API_KEYS: str = ""
@@ -93,11 +69,11 @@ class Settings(BaseSettings):
 
     AIML_VERIFY_MODEL: str = "openai/gpt-5-2-chat-latest"
 
-    AIML_FINANCIAL_MODEL: str = "anthropic/claude-opus-4.8"
+    AIML_FINANCIAL_MODEL: str = "openai/gpt-5-2-chat-latest"
 
     AIML_ROUTER_MODEL: str = "openai/gpt-4.1-nano-2025-04-14"
 
-    AIML_CART_MODEL: str = "deepseek/deepseek-v4-flash"
+    AIML_CART_MODEL: str = "openai/gpt-4o-mini"
 
     @property
     def aiml_api_keys_list(self) -> list[str]:
@@ -112,24 +88,6 @@ class Settings(BaseSettings):
 
         extra = "ignore"
 
-    @property
-    def gemini_api_keys_list(
-        self,
-    ) -> list[str]:
-        return [key.strip() for key in self.GEMINI_API_KEYS.split(",") if key.strip()]
-
-    @property
-    def deepseek_api_keys_list(
-        self,
-    ) -> list[str]:
-        if self.DEEPSEEK_API_KEYS:
-            return [key.strip() for key in self.DEEPSEEK_API_KEYS.split(",") if key.strip()]
-
-        if self.DEEPSEEK_API_KEY:
-            return [self.DEEPSEEK_API_KEY]
-
-        return []
-
     # NEW dynamic today property
     @property
     def today(self) -> str:
@@ -139,9 +97,6 @@ class Settings(BaseSettings):
         self,
     ) -> None:
         missing = []
-
-        if not self.gemini_api_keys_list:
-            missing.append("GEMINI_API_KEYS")
 
         if not self.REDIS_URL:
             missing.append("REDIS_URL")

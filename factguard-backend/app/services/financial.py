@@ -26,11 +26,62 @@ from app.services.cache import (
     set_cached_serp,
 )
 
-from app.services.deepseek import (
-    FINANCIAL_SYSTEM_PROMPT,
-    FINANCIAL_USER_PROMPT,
-    deepseek_financial_analysis,
-)
+FINANCIAL_SYSTEM_PROMPT = """You are ORACLE, FactGuard's quant-grade market
+intelligence engine. You synthesize real-time web data, price signals, and
+macroeconomic context into institutional-quality market briefs.
+
+You serve: retail investors needing clarity, journalists covering markets,
+and analysts who need a rapid second opinion.
+
+## DATA INPUTS YOU RECEIVE
+1. Live web search results (BrightData SERP) — news, analyst reports, filings
+2. yFinance OHLCV data (when available) — exact price, volume, 30-day history
+3. The user's specific query
+
+## ANALYSIS FRAMEWORK
+Inside <scratchpad>:
+ A. PRICE CONTEXT: Current price vs 7d, 30d, 52w. Volume trend. Volatility.
+ B. CATALYST SCAN: Identify all bullish and bearish catalysts from evidence.
+ C. SENTIMENT READ: Is news sentiment broadly positive, negative, or mixed?
+ D. RISK MATRIX: List the top 3 specific risks (not generic "market risk").
+ E. SCENARIO PLANNING: Build three 30-day scenarios with probability weights.
+
+## SIGNAL CLASSIFICATION
+Bullish — Price + momentum + catalyst alignment. Risk-reward favors longs.
+Bearish — Deteriorating fundamentals, negative catalysts, weak technicals.
+Neutral — Mixed signals, consolidation, or insufficient data.
+
+## OUTPUT CONTRACT — VALID JSON ONLY
+{
+  "signal": "Bullish|Bearish|Neutral",
+  "signal_strength": <int 0-100>,
+  "asset": "Asset name and ticker",
+  "current_price": "price string with currency",
+  "price_trend": "Up|Down|Sideways",
+  "trend_magnitude": "Strong|Moderate|Weak",
+  "risk_level": "High|Medium|Low",
+  "risk_catalysts": ["specific risk 1", "specific risk 2", "specific risk 3"],
+  "key_factors": ["factor1", "factor2", "factor3"],
+  "summary": "3-4 sentence institutional-quality brief. Cite specific numbers.",
+  "prediction_30d": {
+    "bull_case": "Target + probability + catalyst required",
+    "base_case": "Target + probability + assumption",
+    "bear_case": "Target + probability + trigger"
+  },
+  "sources": [{"title": "...", "url": "...", "date": "YYYY-MM-DD"}],
+  "data_freshness": "real-time|intraday|daily|stale"
+}"""
+
+FINANCIAL_USER_PROMPT = """Today's date: {today}
+Query: {query}
+
+## WEB SEARCH RESULTS
+Use these results as your PRIMARY evidence. Weight by source tier (see system prompt).
+If fewer than 3 Tier-1/2 results are available, set confidence to Low and data_quality to the highest tier available.
+
+{search_context_block}
+
+Reason through the evidence, then return the JSON object."""
 
 from app.utils.constants import (
     STATUS_DONE,
@@ -432,98 +483,13 @@ async def _run_ai_analysis(
                 query=query,
                 search_context_block=search_context,
             )
-            raw = await call_aiml(FINANCIAL_SYSTEM_PROMPT, aiml_user, model=settings.AIML_FINANCIAL_MODEL, max_tokens=4096)
+            raw = await call_aiml(FINANCIAL_SYSTEM_PROMPT, aiml_user, model=settings.AIML_FINANCIAL_MODEL, max_tokens=4096, timeout=120.0)
             enriched_analysis = parse_json_response(raw)
             enriched_analysis["_provider"] = "aiml"
             logger.info("Financial analysis completed via AI/ML API")
             return enriched_analysis
         except Exception as e:
             logger.warning(f"AIML financial analysis failed: {e}")
-
-    try:
-        from app.dependencies import get_gemini_service
-        from google.api_core.exceptions import (
-            InternalServerError,
-            ResourceExhausted,
-            ServiceUnavailable,
-        )
-
-        gemini_service = get_gemini_service()
-        max_gemini_retries = len(gemini_service.api_keys)
-
-        gemini_user = FINANCIAL_SYSTEM_PROMPT + "\n\n" + FINANCIAL_USER_PROMPT.format(
-            today=today_str,
-            query=query,
-            search_context_block=search_context,
-        )
-
-        for attempt in range(max_gemini_retries):
-            try:
-                gemini_model = gemini_service.get_model()
-                timeout = 5.0 if attempt == 0 else 30.0
-
-                gemini_resp = await asyncio.wait_for(
-                    asyncio.to_thread(
-                        gemini_model.generate_content,
-                        gemini_user,
-                    ),
-                    timeout=timeout,
-                )
-
-                enriched_analysis = parse_json_response(gemini_resp.text)
-                enriched_analysis["_provider"] = "gemini"
-                logger.info("Financial analysis completed via Gemini")
-                break
-
-            except (
-                asyncio.TimeoutError,
-                ResourceExhausted,
-                InternalServerError,
-                ServiceUnavailable,
-            ):
-                remaining = max_gemini_retries - attempt - 1
-                logger.warning(
-                    f"Gemini attempt {attempt + 1}/{max_gemini_retries} "
-                    f"failed, {remaining} keys remaining"
-                )
-                if remaining > 0:
-                    gemini_service.rotate_key()
-                    await asyncio.sleep(1)
-                    continue
-                raise
-
-    except Exception as e:
-        logger.warning(f"Gemini financial analysis failed: {e}")
-
-    if enriched_analysis is None:
-        try:
-            enriched_analysis = await deepseek_financial_analysis(query, search_context)
-            enriched_analysis["_provider"] = "deepseek"
-            logger.info("Financial analysis completed via DeepSeek")
-        except Exception as e:
-            logger.warning(f"DeepSeek financial analysis failed: {e}")
-
-    if enriched_analysis is None:
-        try:
-            from app.services.groq_service import call_groq
-
-            groq_user = FINANCIAL_USER_PROMPT.format(
-                today=today_str,
-                query=query,
-                search_context_block=search_context,
-            )
-
-            groq_raw = await call_groq(
-                FINANCIAL_SYSTEM_PROMPT,
-                groq_user,
-                max_tokens=4096,
-            )
-
-            enriched_analysis = parse_json_response(groq_raw)
-            enriched_analysis["_provider"] = "groq"
-            logger.info("Financial analysis completed via Groq")
-        except Exception as e:
-            logger.warning(f"Groq financial analysis also failed: {e}")
 
     if enriched_analysis is None:
         enriched_analysis = {
@@ -680,7 +646,7 @@ async def process_financial_analysis(
             "graph_data": graph_data,
             "analysis": analysis,
             "sources": sources,
-            "enriching": False,
+            "enriching": True,
         }
         await save_financial_result(job_id, query, result)
 

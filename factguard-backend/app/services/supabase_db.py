@@ -19,7 +19,6 @@ def _source_toinsert(s: dict, result_id: str) -> dict:
         "relevance": s.get("relevance", 5),
         "summary": s.get("summary", ""),
         "quote": s.get("quote"),
-        "credibility": s.get("credibility"),
     }
 
 

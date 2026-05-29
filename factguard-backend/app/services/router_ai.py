@@ -39,14 +39,7 @@ Classify this input and return the JSON."""
 async def classify_query(
     raw_input: str,
 ) -> dict:
-    """
-    Classify a user query into one of the defined modes.
-    Returns a dict with mode, confidence, reason, normalised_input.
-    Falls back to 'unclear' on any failure.
-    Tries Gemini first, then Groq as fallback.
-    """
-    from app.dependencies import get_gemini_service
-    import asyncio
+    from app.services.aiml_service import call_aiml
 
     user_prompt = ROUTER_USER_PROMPT.format(
         raw_input=raw_input,
@@ -60,105 +53,30 @@ async def classify_query(
         "unsafe",
     }
 
-    for provider in ("aiml", "gemini", "deepseek", "groq"):
-        try:
-            if provider == "aiml":
-                from app.services.aiml_service import call_aiml
+    try:
+        text = await call_aiml(
+            ROUTER_SYSTEM_PROMPT,
+            user_prompt,
+            model=settings.AIML_ROUTER_MODEL,
+            max_tokens=200,
+        )
 
-                text = await call_aiml(
-                    ROUTER_SYSTEM_PROMPT,
-                    user_prompt,
-                    model=settings.AIML_ROUTER_MODEL,
-                    max_tokens=200,
-                )
+        result = parse_json_response(text)
 
-            elif provider == "gemini":
-                from google.api_core.exceptions import (
-                    InternalServerError,
-                    ResourceExhausted,
-                    ServiceUnavailable,
-                )
+        mode = result.get("mode", "unclear")
+        if mode not in valid_modes:
+            mode = "unclear"
 
-                gemini_service = get_gemini_service()
-                max_gemini_retries = len(gemini_service.api_keys)
+        return {
+            "mode": mode,
+            "confidence": result.get("confidence", "Low"),
+            "reason": result.get("reason", "Classification failed."),
+            "normalised_input": (result.get("normalised_input") or raw_input),
+            "_provider": "aiml",
+        }
 
-                for attempt in range(max_gemini_retries):
-                    try:
-                        model = gemini_service.get_model()
-                        timeout = 5.0 if attempt == 0 else 10.0
-
-                        response = await asyncio.wait_for(
-                            asyncio.to_thread(
-                                model.generate_content,
-                                user_prompt,
-                            ),
-                            timeout=timeout,
-                        )
-
-                        text = response.text
-                        break
-
-                    except (
-                        asyncio.TimeoutError,
-                        ResourceExhausted,
-                        InternalServerError,
-                        ServiceUnavailable,
-                    ):
-                        remaining = max_gemini_retries - attempt - 1
-                        logger.warning(
-                            f"Gemini attempt {attempt + 1}/{max_gemini_retries} "
-                            f"failed, {remaining} keys remaining"
-                        )
-                        if remaining > 0:
-                            gemini_service.rotate_key()
-                            await asyncio.sleep(1)
-                            continue
-                        raise
-
-            elif provider == "deepseek":
-                from app.services.deepseek import (
-                    call_deepseek,
-                )
-
-                text = await call_deepseek(
-                    ROUTER_SYSTEM_PROMPT,
-                    user_prompt,
-                    max_tokens=200,
-                )
-
-            else:
-                from app.services.groq_service import (
-                    call_groq,
-                )
-
-                text = await call_groq(
-                    ROUTER_SYSTEM_PROMPT,
-                    user_prompt,
-                    max_tokens=200,
-                )
-
-            result = parse_json_response(text)
-
-            mode = result.get("mode", "unclear")
-            if mode not in valid_modes:
-                mode = "unclear"
-
-            return {
-                "mode": mode,
-                "confidence": result.get(
-                    "confidence",
-                    "Low",
-                ),
-                "reason": result.get(
-                    "reason",
-                    "Classification failed.",
-                ),
-                "normalised_input": (result.get("normalised_input") or raw_input),
-                "_provider": provider,
-            }
-
-        except Exception as e:
-            logger.warning(f"Router {provider} failed: {e}")
+    except Exception as e:
+        logger.warning(f"Router AIML failed: {e}")
 
     return {
         "mode": "unclear",

@@ -20,11 +20,11 @@ def _get_keys() -> list[str]:
     return keys
 
 
-def _make_client(api_key: str) -> AsyncOpenAI:
+def _make_client(api_key: str, timeout: float = 30.0) -> AsyncOpenAI:
     return AsyncOpenAI(
         api_key=api_key,
         base_url="https://api.aimlapi.com/v1",
-        timeout=30.0,
+        timeout=timeout,
         max_retries=0,
     )
 
@@ -62,6 +62,7 @@ async def call_aiml(
     model: str | None = None,
     max_tokens: int = 4096,
     temperature: float = 0.2,
+    timeout: float = 60.0,
 ) -> str:
     keys = _get_keys()
     resolved_model = model or settings.AIML_API_MODEL
@@ -71,7 +72,7 @@ async def call_aiml(
             logger.info(f"AIML key[{key_index}] is marked exhausted — skipping")
             continue
 
-        client = _make_client(api_key)
+        client = _make_client(api_key, timeout)
         try:
             logger.info(f"AIML call: model={resolved_model}, key_index={key_index}")
             response = await client.chat.completions.create(

@@ -11,7 +11,6 @@ from app.services.brightdata import (
     unlocker_scrape,
     browser_render,
     serp_search,
-    mcp_discover,
 )
 from app.services.cache import get_cached_serp, set_cached_serp
 from app.utils.duckduckgo import search as _duckduckgo_search
@@ -128,21 +127,11 @@ async def extract_article_content(url: str) -> dict:
 
 
 async def search_with_fallback(query: str, max_results: int = 8) -> list[dict]:
-    """Multi-tier SERP strategy: MCP Discover → Bright Data SERP → DuckDuckGo, with Redis cache."""
+    """Multi-tier SERP strategy: Bright Data SERP → DuckDuckGo, with Redis cache."""
     cached = await get_cached_serp(query)
     if cached is not None:
         logger.info(f"SERP cache hit: {query[:60]}")
         return cached
-
-    mcp_results = await _call_with_circuit_breaker(
-        "mcp_discover", mcp_discover, query, threshold=3, cooldown=30.0
-    )
-    if mcp_results:
-        logger.info(f"MCP Discover returned {len(mcp_results)} results")
-        for r in mcp_results:
-            r["bright_data_product"] = "MCP Server — Discover"
-        await set_cached_serp(query, mcp_results)
-        return mcp_results
 
     results = await _call_with_circuit_breaker(
         "serp_api", serp_search, query, max_results, threshold=2, cooldown=15.0

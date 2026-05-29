@@ -76,128 +76,6 @@ def format_listings_table(listings: list[dict]) -> str:
     return "\n".join(rows)
 
 
-async def _call_gemini(
-    user_prompt: str,
-    model_name: str | None = None,
-) -> dict | None:
-    """Try Gemini with per-key exponential backoff for 503/429."""
-    from app.dependencies import get_gemini_service
-
-    gemini_service = get_gemini_service()
-    max_keys = len(gemini_service.api_keys)
-
-    from google.api_core.exceptions import (
-        InternalServerError,
-        ResourceExhausted,
-        ServiceUnavailable,
-    )
-    import asyncio
-
-    for attempt in range(max_keys):
-        model = gemini_service.get_model()
-        timeout = 10.0
-
-        for retry in range(3):
-            try:
-                response = await asyncio.wait_for(
-                    asyncio.to_thread(model.generate_content, user_prompt),
-                    timeout=timeout,
-                )
-                result = parse_json_response(response.text)
-                logger.info(f"Gemini enrichment OK ({model_name or 'default'})")
-                return result
-            except (ServiceUnavailable, ResourceExhausted) as e:
-                status = getattr(e, 'code', 0)
-                if status in (503, 429) or '503' in str(e) or '429' in str(e):
-                    delay = 2 ** retry
-                    logger.warning(
-                        f"Gemini overloaded ({model_name or 'default'}, "
-                        f"key {attempt + 1}/{max_keys}, retry {retry + 1}/3) "
-                        f"— backing off {delay}s"
-                    )
-                    await asyncio.sleep(delay)
-                    continue
-                break
-            except (asyncio.TimeoutError, InternalServerError):
-                break
-
-        remaining = max_keys - attempt - 1
-        if remaining > 0:
-            try:
-                gemini_service.rotate_key()
-            except Exception:
-                pass
-            await asyncio.sleep(1)
-            continue
-
-    return None
-
-
-async def _call_gemini_flash(user_prompt: str) -> dict | None:
-    """Fallback: call Gemini with the lighter flash model."""
-    try:
-        from app.config import settings
-        from google import genai
-        from app.dependencies import _GeminiModelWrapper
-
-        keys = settings.gemini_api_keys_list
-        if not keys:
-            return None
-
-        client = genai.Client(api_key=keys[0])
-        model = _GeminiModelWrapper(client, "gemini-2.0-flash")
-        import asyncio
-
-        response = await asyncio.wait_for(
-            asyncio.to_thread(model.generate_content, user_prompt),
-            timeout=20.0,
-        )
-        result = parse_json_response(response.text)
-        logger.info("Gemini flash enrichment OK")
-        return result
-    except Exception as e:
-        logger.warning(f"Gemini flash enrichment failed: {e}")
-        return None
-
-
-async def _call_claude_haiku(user_prompt: str) -> dict | None:
-    """Fallback: call Anthropic Claude Haiku."""
-    try:
-        from app.config import settings
-
-        key = settings.CLAUDE_API_KEY or settings.CLAUDE_API_KEYS.split(",")[0].strip() if settings.CLAUDE_API_KEYS else None
-        if not key:
-            return None
-
-        import httpx
-
-        async with httpx.AsyncClient(timeout=30) as client:
-            resp = await client.post(
-                "https://api.anthropic.com/v1/messages",
-                headers={
-                    "x-api-key": key,
-                    "anthropic-version": "2023-06-01",
-                    "content-type": "application/json",
-                },
-                json={
-                    "model": "claude-haiku-4-5-20251001",
-                    "max_tokens": 2048,
-                    "system": CART_SYSTEM_PROMPT,
-                    "messages": [{"role": "user", "content": user_prompt}],
-                },
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            content = data.get("content", [])
-            if content:
-                result = parse_json_response(content[0].get("text", ""))
-                logger.info("Claude Haiku enrichment OK")
-                return result
-    except Exception as e:
-        logger.warning(f"Claude Haiku enrichment failed: {e}")
-    return None
-
-
 def _regex_fallback(listings: list[dict], product_name: str) -> dict:
     """Last-resort: extract prices from listing titles/snippets via regex."""
     logger.info("Using regex fallback for cart enrichment")
@@ -330,58 +208,26 @@ async def enrich_cart_listings(
         await set_progress(job_id, "Running AI price analysis...")
 
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    listings_table = format_listings_table(listings)
+    # Send top 12 listings for faster AI response
+    top_listings = listings[:12]
+    listings_table = format_listings_table(top_listings)
     user_prompt = CART_USER_PROMPT.format(
         product_name=product_name, today=today, listings_table=listings_table,
     )
 
     result = None
 
-    # Attempt 1: AI/ML API (primary)
     try:
         if settings.AIML_API_ENABLED and settings.aiml_api_keys_list:
             from app.services.aiml_service import call_aiml
-            raw = await call_aiml(CART_SYSTEM_PROMPT, user_prompt, model=settings.AIML_CART_MODEL, max_tokens=2048)
+            raw = await call_aiml(CART_SYSTEM_PROMPT, user_prompt, model=settings.AIML_CART_MODEL, max_tokens=2048, timeout=45.0)
             result = parse_json_response(raw)
             logger.info("Cart enrichment via AI/ML API")
     except Exception as e:
         logger.warning(f"AIML enrichment failed: {e}")
 
-    # Attempt 2: Gemini with exponential backoff + key rotation
     if result is None:
-        result = await _call_gemini(user_prompt)
-
-    # Attempt 3: Gemini flash (lighter model, less contention)
-    if result is None:
-        result = await _call_gemini_flash(user_prompt)
-
-    # Attempt 4: DeepSeek
-    if result is None:
-        try:
-            from app.services.deepseek import call_deepseek
-            raw = await call_deepseek(CART_SYSTEM_PROMPT, user_prompt, max_tokens=2048)
-            result = parse_json_response(raw)
-            logger.info("Cart enrichment via DeepSeek")
-        except Exception as e:
-            logger.warning(f"DeepSeek enrichment failed: {e}")
-
-    # Attempt 5: Groq
-    if result is None:
-        try:
-            from app.services.groq_service import call_groq
-            raw = await call_groq(CART_SYSTEM_PROMPT, user_prompt, max_tokens=2048)
-            result = parse_json_response(raw)
-            logger.info("Cart enrichment via Groq")
-        except Exception as e:
-            logger.warning(f"Groq enrichment failed: {e}")
-
-    # Attempt 6: Claude Haiku
-    if result is None:
-        result = await _call_claude_haiku(user_prompt)
-
-    # Post-process: fill gaps and compute deterministic deal scores
-    if result is None:
-        logger.warning("All AI fallbacks exhausted — using regex extraction")
+        logger.warning("AIML unavailable — using regex extraction")
         result = _regex_fallback(listings, product_name)
 
     return _post_process_result(result, listings, product_name)

@@ -3,6 +3,8 @@ import sys
 import asyncio
 import uuid
 
+os.environ.setdefault("NO_COLOR", "1")
+
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 

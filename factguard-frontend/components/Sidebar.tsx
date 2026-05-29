@@ -21,15 +21,6 @@ const MODE_ICONS: Record<AppMode, LucideIcon> = {
   cart: ShoppingCart,
 };
 
-const HEALTH_SOURCES = [
-  { key: 'serp', label: 'SERP API', color: '#4F46E5' },
-  { key: 'unlocker', label: 'Web Unlocker', color: '#7C3AED' },
-  { key: 'crawl', label: 'Crawl API', color: '#06B6D4' },
-  { key: 'proxy', label: 'Proxy Net', color: '#F59E0B' },
-  { key: 'mcp', label: 'MCP Server', color: '#10B981' },
-  { key: 'aiml', label: 'AI/ML API', color: '#EC4899' },
-];
-
 interface HistoryEntry {
   jobId: string;
   claim?: string;
@@ -66,25 +57,9 @@ export function Sidebar() {
   const searchParams = useSearchParams();
   const { theme, toggleTheme } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
-  const [health, setHealth] = useState<Record<string, boolean>>({});
-  const [showTooltip, setShowTooltip] = useState<string | null>(null);
   const [recentHistory, setRecentHistory] = useState<HistoryEntry[]>([]);
 
   const currentMode: AppMode = (searchParams.get('mode') as AppMode) || 'verify';
-
-  // Simulate health polling (matching enterprise approach)
-  useEffect(() => {
-    const fetchHealth = () => {
-      const next: Record<string, boolean> = {};
-      HEALTH_SOURCES.forEach((s) => {
-        next[s.key] = Math.random() > 0.04;
-      });
-      setHealth(next);
-    };
-    fetchHealth();
-    const interval = setInterval(fetchHealth, 30000);
-    return () => clearInterval(interval);
-  }, []);
 
   useEffect(() => {
     async function fetchHistory() {
@@ -270,51 +245,6 @@ export function Sidebar() {
             )}
           </div>
         )}
-      </div>
-
-      {/* Data Sources */}
-      <div className="p-3 border-t border-[var(--color-border-subtle)]">
-        {!collapsed && <div className="data-label px-2 mb-2">Data Sources</div>}
-        <div className="space-y-1">
-          {HEALTH_SOURCES.map((source) => {
-            const isUp = health[source.key] !== false;
-            return (
-              <div
-                key={source.key}
-                className="relative flex items-center gap-2 px-2 py-1 rounded hover:bg-[var(--color-bg-elevated)] transition-colors"
-                onMouseEnter={() => setShowTooltip(source.key)}
-                onMouseLeave={() => setShowTooltip(null)}
-              >
-                <div
-                  className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isUp ? 'pulse-live' : ''}`}
-                  style={{ backgroundColor: isUp ? source.color : '#EF4444' }}
-                />
-                <AnimatePresence>
-                  {!collapsed && (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="text-xs text-[var(--color-text-secondary)] truncate flex-1"
-                    >
-                      {source.label}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-                {showTooltip === source.key && (
-                  <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 z-50 px-3 py-2 text-xs whitespace-nowrap rounded-lg"
-                    style={{ backgroundColor: 'var(--color-bg-surface)', border: '1px solid var(--color-border-default)', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}
-                  >
-                    <div style={{ color: 'var(--color-text-primary)' }}>{source.label}</div>
-                    <div className="data-label mt-1">
-                      {isUp ? 'OPERATIONAL · 0 failures' : 'CIRCUIT OPEN · 3 failures'}
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
       </div>
 
       {/* Bottom controls */}

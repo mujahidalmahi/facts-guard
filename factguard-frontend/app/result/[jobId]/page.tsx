@@ -146,6 +146,12 @@ export default function ResultPage({ params }: { params: Promise<{ jobId: string
         }
 
         mountedRef.current && setData(result);
+
+        if (result.enriching === true) {
+          currentInterval = Math.min(currentInterval * 1.5, MAX_INTERVAL);
+          timer = setTimeout(poll, currentInterval);
+          return;
+        }
       } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') return;
         console.error(err);

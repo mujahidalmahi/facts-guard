@@ -17,9 +17,6 @@ BRIGHTDATA_ENDPOINT = "https://api.brightdata.com/request"
 BRIGHTDATA_CRAWL_ENDPOINT = "https://api.brightdata.com/crawl"
 BRIGHTDATA_BROWSER_ENDPOINT = "https://api.brightdata.com/browser"
 
-_mcp_disabled: bool = False
-_mcp_warned: bool = False
-
 PAYWALL_DOMAINS = [
     "bloomberg.com",
     "wsj.com",
@@ -315,53 +312,6 @@ async def browser_extract_text(
         await set_cached_browser_extract(url, text)
 
     return text
-
-
-async def mcp_discover(query: str) -> list[dict]:
-    """BrightData MCP Discover action."""
-    global _mcp_disabled, _mcp_warned
-
-    if _mcp_disabled:
-        return []
-
-    api_key = _get_api_key()
-    if not api_key:
-        return []
-
-    mcp_url = settings.BRIGHTDATA_MCP_URL
-    if not mcp_url:
-        if not _mcp_warned:
-            logger.warning("BRIGHTDATA_MCP_URL not set — MCP discover disabled")
-            _mcp_warned = True
-        return []
-
-    try:
-        payload = {
-            "action": "discover",
-            "query": query,
-            "max_results": 8,
-        }
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                mcp_url, json=payload, headers=_headers(), timeout=20
-            )
-            if resp.status_code == 404:
-                if not _mcp_warned:
-                    logger.warning(
-                        f"MCP URL {mcp_url} returned 404 — disabling MCP discover. "
-                        "Set BRIGHTDATA_MCP_URL env var to the correct endpoint."
-                    )
-                    _mcp_warned = True
-                _mcp_disabled = True
-                return []
-            resp.raise_for_status()
-            data = resp.json()
-        results = data.get("results", []) if isinstance(data, dict) else []
-        logger.info(f"MCP Discover returned {len(results)} results")
-        return results
-    except Exception as e:
-        logger.warning(f"MCP Discover failed: {e}")
-        return []
 
 
 async def proxy_request(url: str, country: str = "us") -> Optional[str]:

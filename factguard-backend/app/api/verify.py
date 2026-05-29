@@ -199,6 +199,9 @@ async def get_result(
                 result = db_row.get("raw_json")
 
         if result:
+            claim = await get_claim_by_job_id(job_id)
+            if claim:
+                result["claim"] = claim.get("claim_text", "")
             return result
 
         claim = await get_claim_by_job_id(job_id)

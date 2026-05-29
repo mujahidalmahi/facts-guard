@@ -15,9 +15,9 @@ def _sanitize(obj: Any) -> Any:
             return None
         return obj
     if isinstance(obj, dict):
-        return {k: _sanitize(v) for k, v in obj.items()}
+        return {k: _sanitize(v) for k, v in list(obj.items())}
     if isinstance(obj, list):
-        return [_sanitize(v) for v in obj]
+        return [_sanitize(v) for v in list(obj)]
     return obj
 
 

@@ -123,8 +123,6 @@ async def evaluate_source_credibility(
     if not sources:
         return []
 
-    import asyncio
-
     sources_lines = []
     for i, s in enumerate(sources):
         sources_lines.append(f"[{i}] Title: {s.get('title', '')} | URL: {s.get('url', '')}")
@@ -150,111 +148,7 @@ async def evaluate_source_credibility(
         except Exception as e:
             logger.warning(f"AIML credibility evaluation failed: {e}")
 
-    from app.dependencies import get_gemini_service
-
-    try:
-        from google.api_core.exceptions import (
-            InternalServerError,
-            ResourceExhausted,
-            ServiceUnavailable,
-        )
-
-        gemini_service = get_gemini_service()
-        max_gemini_retries = len(gemini_service.api_keys)
-
-        for attempt in range(max_gemini_retries):
-            try:
-                model = gemini_service.get_model()
-                if model is None:
-                    raise ValueError("Gemini model not initialized")
-
-                timeout = 5.0 if attempt == 0 else 10.0
-
-                response = await asyncio.wait_for(
-                    asyncio.to_thread(
-                        model.generate_content,
-                        user_prompt,
-                    ),
-                    timeout=timeout,
-                )
-
-                ratings = parse_json_response(response.text)
-
-                for rating in ratings:
-                    idx = rating.get("index")
-                    if idx is not None and idx < len(sources):
-                        sources[idx]["credibility"] = rating.get("credibility", "Medium")
-                        sources[idx]["credibility_reason"] = rating.get("reason", "")
-
-                return _enrich_with_scoring(sources)
-
-            except (
-                asyncio.TimeoutError,
-                ResourceExhausted,
-                InternalServerError,
-                ServiceUnavailable,
-            ):
-                remaining = max_gemini_retries - attempt - 1
-                logger.warning(
-                    f"Gemini attempt {attempt + 1}/{max_gemini_retries} "
-                    f"failed, {remaining} keys remaining"
-                )
-                if remaining > 0:
-                    gemini_service.rotate_key()
-                    await asyncio.sleep(1)
-                    continue
-                raise
-
-    except Exception as e:
-        logger.warning(f"Gemini credibility evaluation failed: {e}")
-
-    # Fallback to DeepSeek
-    try:
-        from app.services.deepseek import call_deepseek
-
-        raw = await call_deepseek(
-            CREDIBILITY_SYSTEM_PROMPT,
-            user_prompt,
-            max_tokens=1024,
-        )
-
-        ratings = parse_json_response(raw)
-
-        for rating in ratings:
-            idx = rating.get("index")
-            if idx is not None and idx < len(sources):
-                sources[idx]["credibility"] = rating.get("credibility", "Medium")
-                sources[idx]["credibility_reason"] = rating.get("reason", "")
-
-        return _enrich_with_scoring(sources)
-
-    except Exception as e:
-        logger.warning(f"DeepSeek credibility evaluation failed: {e}")
-
-    # Fallback to Groq (last resort AI)
-    try:
-        from app.services.groq_service import call_groq
-
-        raw = await call_groq(
-            CREDIBILITY_SYSTEM_PROMPT,
-            user_prompt,
-            max_tokens=1024,
-        )
-
-        ratings = parse_json_response(raw)
-
-        for rating in ratings:
-            idx = rating.get("index")
-            if idx is not None and idx < len(sources):
-                sources[idx]["credibility"] = rating.get("credibility", "Medium")
-                sources[idx]["credibility_reason"] = rating.get("reason", "")
-
-        return _enrich_with_scoring(sources)
-
-    except Exception as e:
-        logger.warning(f"Groq credibility evaluation also failed: {e}, falling back to heuristic")
-
-    # Final heuristic fallback
+    # Heuristic fallback
     sources = _heuristic_credibility(sources)
     return _enrich_with_scoring(sources)
 

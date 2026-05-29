@@ -152,6 +152,7 @@ def _build_ai_analysis(
 
 def _listing_to_response(
     listing: dict,
+    enrichment_entry: dict | None = None,
 ) -> dict:
     trust = get_trust_level(
         listing.get(
@@ -161,6 +162,8 @@ def _listing_to_response(
     ).lower()
 
     trust_signal = "green" if trust == "high" else ("yellow" if trust == "medium" else "red")
+
+    enrich = enrichment_entry or {}
 
     return {
         "title": listing.get(
@@ -180,10 +183,10 @@ def _listing_to_response(
             "url",
             "",
         ),
-        "trust_level": trust_signal.upper(),
-        "deal_score": 0,
-        "trust_reason": "",
-        "counterfeit_risk": "None",
+        "trust_level": enrich.get("trust_level", trust_signal.upper()),
+        "deal_score": enrich.get("deal_score", 0),
+        "trust_reason": enrich.get("trust_reason", ""),
+        "counterfeit_risk": enrich.get("counterfeit_risk", "None"),
         "condition": listing.get(
             "condition",
             "Unknown",
@@ -358,6 +361,8 @@ async def get_full_price_result(
         listings_data,
     )
 
+    enrich_listings = (ai_enrichment or {}).get("listings", [])
+
     result = {
         "mode": "cart",
         "status": status,
@@ -370,7 +375,13 @@ async def get_full_price_result(
             "",
         ),
         "createdAt": query.get("created_at"),
-        "listings": [_listing_to_response(listing) for listing in listings_data],
+        "listings": [
+            _listing_to_response(
+                listing,
+                enrich_listings[i] if i < len(enrich_listings) else None,
+            )
+            for i, listing in enumerate(listings_data)
+        ],
         "analysis": analysis,
     }
 
@@ -395,7 +406,7 @@ async def fetch_product_prices(
     search_query = f"{product_name} " f"price buy online"
 
     marketplace_task = asyncio.wait_for(
-        search_all_marketplaces(product_name), timeout=130
+        search_all_marketplaces(product_name), timeout=30
     )
     serp_task = asyncio.wait_for(
         search_claim(search_query, max_results=10), timeout=40
@@ -434,6 +445,8 @@ async def fetch_product_prices(
             title = r.get("title", "")
 
             price = extract_price(snippet) or extract_price(title)
+            if price is None:
+                continue
             merchant = classify_merchant(url)
             model_name = extract_model_name(title)
 
