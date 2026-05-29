@@ -1,0 +1,38 @@
+# secrets
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+*.egg
+
+# Archives / backups
+*.zip
+*.tar.gz
+*.7z
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Shell / editor remnants
+mkdir
+python
+python3.12
+source
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Ignored node modules (root-level copy)
+.ignored_node_modules/
+
+# Build artifacts
+tmp_wheels/
+*.whl

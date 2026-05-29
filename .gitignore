@@ -1,0 +1,10 @@
+*.zip
+*.tar.gz
+
+# Environment files with secrets
+.env
+.env.local
+.env.production
+*.env
+factguard-backend/.env
+factguard-frontend/.env

@@ -1,0 +1,70 @@
+[2026-05-29 16:20:08] INFO     factguard.main:lifespan:86 - All required env vars present
+[2026-05-29 16:20:14] [174bbb9c-f640-4951-bf72-83d54b6e4ef8] INFO     factguard.pricing:cart:45 - Starting cart check (job_id: 424e47d4-81da-4dc2-a0f0-c98b75bf2520, product: asus vivobook 15)
+[2026-05-29 16:20:14] [174bbb9c-f640-4951-bf72-83d54b6e4ef8] INFO     factguard.dependencies:_initialize:127 - Supabase client initialized successfully
+INFO:     127.0.0.1:52303 - "POST /cart HTTP/1.1" 200 OK
+[2026-05-29 16:20:16] [174bbb9c-f640-4951-bf72-83d54b6e4ef8] INFO     factguard.pricing:process_price_check:494 - Cache hit for product search: asus vivobook 15
+[2026-05-29 16:20:16] [174bbb9c-f640-4951-bf72-83d54b6e4ef8] INFO     factguard.aiml_service:call_aiml:77 - AIML call: model=openai/gpt-4o-mini, key_index=0
+INFO:     127.0.0.1:56767 - "GET /price-result/424e47d4-81da-4dc2-a0f0-c98b75bf2520 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56358 - "GET /price-result/424e47d4-81da-4dc2-a0f0-c98b75bf2520 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56360 - "GET /price-result/424e47d4-81da-4dc2-a0f0-c98b75bf2520 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56363 - "GET /price-result/424e47d4-81da-4dc2-a0f0-c98b75bf2520 HTTP/1.1" 200 OK
+[2026-05-29 16:20:40] [174bbb9c-f640-4951-bf72-83d54b6e4ef8] INFO     factguard.aiml_service:call_aiml:88 - AIML success: 5823 chars (key_index=0)
+[2026-05-29 16:20:40] [174bbb9c-f640-4951-bf72-83d54b6e4ef8] INFO     factguard.cart_ai:enrich_cart_listings:349 - Cart enrichment via AI/ML API
+[2026-05-29 16:20:40] [174bbb9c-f640-4951-bf72-83d54b6e4ef8] INFO     factguard.pricing:process_price_check:570 - Price check 36ef00c4-cd4e-415a-a401-0041e52fe6e7 completed with 18 listings
+INFO:     127.0.0.1:56365 - "GET /price-result/424e47d4-81da-4dc2-a0f0-c98b75bf2520 HTTP/1.1" 200 OK
+[2026-05-29 16:33:35] [80b30473-45fb-40a0-b24a-1b6de3832aac] WARNING  factguard.cache:get_cached_history:74 - Redis get_cached_history failed: Error while reading from boss-monkfish-132341.upstash.io:6379 : (22, 'The specified network name is no longer available', None, 64, None)
+INFO:     127.0.0.1:58691 - "GET /history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64832 - "OPTIONS /cart HTTP/1.1" 200 OK
+[2026-05-29 16:33:50] [66971b3f-40a4-41be-a6c4-e7b2f01d6654] INFO     factguard.pricing:cart:45 - Starting cart check (job_id: 92128ba1-e01a-4cbe-a1df-f314bfc0acc6, product: iphone 14)
+INFO:     127.0.0.1:60936 - "POST /cart HTTP/1.1" 200 OK
+[2026-05-29 16:33:51] [66971b3f-40a4-41be-a6c4-e7b2f01d6654] INFO     factguard.pricing:process_price_check:507 - Cache miss, searching prices for: iphone 14
+[2026-05-29 16:33:53] [66971b3f-40a4-41be-a6c4-e7b2f01d6654] INFO     factguard.brightdata:_run:228 - Connecting to BrightData CDP for: https://www.amazon.com/s?k=iphone%2014&ref=nb_sb_noss
+INFO:     127.0.0.1:60936 - "GET /price-result/92128ba1-e01a-4cbe-a1df-f314bfc0acc6?mode=cart HTTP/1.1" 200 OK
+[2026-05-29 16:33:55] [66971b3f-40a4-41be-a6c4-e7b2f01d6654] WARNING  factguard.brightdata:mcp_discover:363 - MCP Discover failed: Client error '400 Bad Request' for url 'https://mcp.brightdata.com/mcp?token=4271eeee-46ac-4864-8efd-1b8261f8fe64'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400
+[2026-05-29 16:33:55] [66971b3f-40a4-41be-a6c4-e7b2f01d6654] WARNING  factguard.routing:_call_with_circuit_breaker:67 - Circuit breaker 'mcp_discover' failure 1/3: Empty result from mcp_discover
+[2026-05-29 16:33:55] [66971b3f-40a4-41be-a6c4-e7b2f01d6654] INFO     factguard.brightdata:serp_search:101 - Using configured SERP zone: serp_api1
+INFO:     127.0.0.1:60936 - "GET /price-result/92128ba1-e01a-4cbe-a1df-f314bfc0acc6?mode=cart HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60936 - "GET /price-result/92128ba1-e01a-4cbe-a1df-f314bfc0acc6?mode=cart HTTP/1.1" 200 OK
+[2026-05-29 16:34:01] [66971b3f-40a4-41be-a6c4-e7b2f01d6654] INFO     factguard.brightdata:serp_search:145 - BrightData SERP (google) returned 10 results
+[2026-05-29 16:34:02] [66971b3f-40a4-41be-a6c4-e7b2f01d6654] INFO     factguard.search:search_claim:171 - Routing search returned 10 results
+INFO:     127.0.0.1:60936 - "GET /price-result/92128ba1-e01a-4cbe-a1df-f314bfc0acc6?mode=cart HTTP/1.1" 200 OK
+[2026-05-29 16:34:09] [66971b3f-40a4-41be-a6c4-e7b2f01d6654] INFO     factguard.brightdata:_run:237 - scrape_page_full: https://www.amazon.com/s?k=iphone%2014&ref=nb_sb_noss (1407330 chars)
+[2026-05-29 16:34:10] [66971b3f-40a4-41be-a6c4-e7b2f01d6654] INFO     factguard.marketplace_scraper:amazon_search:109 - Amazon scrape: 8 listings
+[2026-05-29 16:34:11] [66971b3f-40a4-41be-a6c4-e7b2f01d6654] INFO     factguard.aiml_service:call_aiml:77 - AIML call: model=openai/gpt-4o-mini, key_index=0
+INFO:     127.0.0.1:60499 - "GET /price-result/92128ba1-e01a-4cbe-a1df-f314bfc0acc6?mode=cart HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51662 - "GET /price-result/92128ba1-e01a-4cbe-a1df-f314bfc0acc6?mode=cart HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57635 - "GET /price-result/92128ba1-e01a-4cbe-a1df-f314bfc0acc6?mode=cart HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62098 - "GET /price-result/92128ba1-e01a-4cbe-a1df-f314bfc0acc6?mode=cart HTTP/1.1" 200 OK
+[2026-05-29 16:34:36] [66971b3f-40a4-41be-a6c4-e7b2f01d6654] INFO     factguard.aiml_service:call_aiml:88 - AIML success: 6156 chars (key_index=0)
+[2026-05-29 16:34:36] [66971b3f-40a4-41be-a6c4-e7b2f01d6654] INFO     factguard.cart_ai:enrich_cart_listings:349 - Cart enrichment via AI/ML API
+[2026-05-29 16:34:37] [66971b3f-40a4-41be-a6c4-e7b2f01d6654] INFO     factguard.pricing:process_price_check:570 - Price check 5f2f3d0e-314f-4b7a-aaf2-eda71073f338 completed with 12 listings
+INFO:     127.0.0.1:65277 - "GET /price-result/92128ba1-e01a-4cbe-a1df-f314bfc0acc6?mode=cart HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59431 - "GET /result/92128ba1-e01a-4cbe-a1df-f314bfc0acc6?mode=verify HTTP/1.1" 200 OK
+[2026-05-29 16:34:41] [3f69182e-52e2-4f9f-a4be-c2e7b62d0c2b] INFO     factguard.pricing:get_full_price_result:280 - Cart cache hit: 92128ba1-e01a-4cbe-a1df-f314bfc0acc6
+INFO:     127.0.0.1:65277 - "GET /price-result/92128ba1-e01a-4cbe-a1df-f314bfc0acc6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52882 - "GET /history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53187 - "POST /verify HTTP/1.1" 202 Accepted
+[2026-05-29 17:59:08] [bbb1498f-6dd3-4981-9bb1-4b3a8ccdbfdd] WARNING  factguard.brightdata:mcp_discover:363 - MCP Discover failed: Client error '400 Bad Request' for url 'https://mcp.brightdata.com/mcp?token=4271eeee-46ac-4864-8efd-1b8261f8fe64'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400
+INFO:     127.0.0.1:53187 - "GET /result/9b917d51-a6d8-4af4-8183-9b16324d95f9?mode=verify HTTP/1.1" 200 OK
+[2026-05-29 17:59:08] [bbb1498f-6dd3-4981-9bb1-4b3a8ccdbfdd] WARNING  factguard.routing:_call_with_circuit_breaker:67 - Circuit breaker 'mcp_discover' failure 1/3: Empty result from mcp_discover
+INFO:     127.0.0.1:53187 - "GET /result/9b917d51-a6d8-4af4-8183-9b16324d95f9?mode=verify HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53187 - "GET /result/9b917d51-a6d8-4af4-8183-9b16324d95f9?mode=verify HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53187 - "GET /result/9b917d51-a6d8-4af4-8183-9b16324d95f9?mode=verify HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49392 - "GET /result/9b917d51-a6d8-4af4-8183-9b16324d95f9?mode=verify HTTP/1.1" 200 OK
+[2026-05-29 17:59:30] [bbb1498f-6dd3-4981-9bb1-4b3a8ccdbfdd] INFO     factguard.brightdata:serp_search:145 - BrightData SERP (google) returned 8 results
+[2026-05-29 17:59:30] [bbb1498f-6dd3-4981-9bb1-4b3a8ccdbfdd] INFO     factguard.search:search_claim:171 - Routing search returned 8 results
+[2026-05-29 17:59:31] [bbb1498f-6dd3-4981-9bb1-4b3a8ccdbfdd] INFO     factguard.aiml_service:call_aiml:77 - AIML call: model=openai/gpt-5-2-chat-latest, key_index=0
+INFO:     127.0.0.1:50561 - "GET /result/9b917d51-a6d8-4af4-8183-9b16324d95f9?mode=verify HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49797 - "GET /result/9b917d51-a6d8-4af4-8183-9b16324d95f9?mode=verify HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54494 - "GET /result/9b917d51-a6d8-4af4-8183-9b16324d95f9?mode=verify HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58197 - "GET /result/9b917d51-a6d8-4af4-8183-9b16324d95f9?mode=verify HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54115 - "GET /result/9b917d51-a6d8-4af4-8183-9b16324d95f9?mode=verify HTTP/1.1" 200 OK
+[2026-05-29 18:00:01] [bbb1498f-6dd3-4981-9bb1-4b3a8ccdbfdd] WARNING  factguard.aiml_service:call_aiml:102 - AIML key[0] transient error (None): Request timed out. — retrying once
+INFO:     127.0.0.1:63170 - "GET /result/9b917d51-a6d8-4af4-8183-9b16324d95f9?mode=verify HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62488 - "GET /result/9b917d51-a6d8-4af4-8183-9b16324d95f9?mode=verify HTTP/1.1" 200 OK
+[2026-05-29 18:00:32] [bbb1498f-6dd3-4981-9bb1-4b3a8ccdbfdd] WARNING  factguard.aiml_service:call_aiml:117 - AIML key[0] retry failed: Request timed out. — trying next key
+[2026-05-29 18:00:32] [bbb1498f-6dd3-4981-9bb1-4b3a8ccdbfdd] INFO     factguard.aiml_service:call_aiml:77 - AIML call: model=openai/gpt-5-2-chat-latest, key_index=1
+[2026-05-29 18:01:03] [bbb1498f-6dd3-4981-9bb1-4b3a8ccdbfdd] WARNING  factguard.aiml_service:call_aiml:102 - AIML key[1] transient error (None): Request timed out. — retrying once
+[2026-05-29 18:01:05] [bbb1498f-6dd3-4981-9bb1-4b3a8ccdbfdd] ERROR    factguard.verify:process_claim:72 - Claim processing timed out after 120s
